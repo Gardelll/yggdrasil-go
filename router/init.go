@@ -18,8 +18,10 @@
 package router
 
 import (
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"time"
 	"yggdrasil-go/service"
 )
 
@@ -28,6 +30,14 @@ func InitRouters(router *gin.Engine, db *gorm.DB, meta *ServerMeta, skinRootUrl 
 	if err != nil {
 		panic(err)
 	}
+	router.Use(cors.New(cors.Config{
+		AllowAllOrigins:  true,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "HEAD"},
+		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "User-Agent"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	tokenService := service.NewTokenService()
 	userService := service.NewUserService(tokenService, db)
