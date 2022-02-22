@@ -1,0 +1,86 @@
+<!--
+  ~ Copyright (C) 2022. Gardel <sunxinao@hotmail.com> and contributors
+  ~
+  ~ This program is free software: you can redistribute it and/or modify
+  ~ it under the terms of the GNU Affero General Public License as published by
+  ~ the Free Software Foundation, either version 3 of the License, or
+  ~ (at your option) any later version.
+  ~
+  ~ This program is distributed in the hope that it will be useful,
+  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ~ GNU Affero General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU Affero General Public License
+  ~ along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  -->
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>注册</title>
+  <link rel="stylesheet" href="https://cdn.bootcss.com/normalize/8.0.0/normalize.min.css">
+  <!-- <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700"> -->
+  <link href="https://cdn.bootcss.com/material-components-web/5.1.0/material-components-web.min.css" rel="stylesheet">
+  <script src="https://cdn.bootcss.com/material-components-web/5.1.0/material-components-web.min.js"></script>
+  <link rel="stylesheet" href="login.css">
+</head>
+<body >
+  <noscript>You need to enable JavaScript to run this app.</noscript>
+  <section class="header">
+    <h1>简陋注册页</h1>
+  </section>
+
+  <form id="reg-form" action="#">
+    <div class="mdc-text-field username">
+      <input type="email" class="mdc-text-field__input" id="username-input" name="username" required>
+      <label class="mdc-floating-label" for="username-input">邮箱</label>
+      <div class="mdc-line-ripple"></div>
+    </div>
+	<div class="mdc-text-field profileName">
+	  <input type="text" class="mdc-text-field__input" id="profileName-input" name="profileName" required minlength="2">
+	  <label class="mdc-floating-label" for="profileName-input">角色名</label>
+	  <div class="mdc-line-ripple"></div>
+	</div>
+    <div class="mdc-text-field-helper-line profileName-helper">
+      <div class="mdc-text-field-helper-text" aria-hidden="true">字母，数字或下划线</div>
+    </div>
+    <div class="mdc-text-field password">
+      <input type="password" class="mdc-text-field__input" id="password-input" name="password" required minlength="6">
+      <label class="mdc-floating-label" for="password-input">密码</label>
+      <div class="mdc-line-ripple"></div>
+    </div>
+	<div class="mdc-text-field-helper-line password-helper">
+	  <div class="mdc-text-field-helper-text" aria-hidden="true">警告: 暂无重置密码接口，请妥善保管密码</div>
+	</div>
+    <div class="button-container">
+      <button class="mdc-button mdc-button--raised login">
+        <div class="mdc-button__ripple"></div>
+        <span class="mdc-button__label">
+          已有账号登录
+        </span>
+      </button>
+      <button type="submit" class="mdc-button mdc-button--raised next">
+        <div class="mdc-button__ripple"></div>
+        <span class="mdc-button__label">
+          下一步
+        </span>
+      </button>
+    </div>
+  </form>
+  <div class="mdc-snackbar">
+    <div class="mdc-snackbar__surface">
+      <div class="mdc-snackbar__label"
+           role="status"
+           aria-live="polite">
+        注册失败
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.bootcss.com/jquery/3.5.0/jquery.min.js"></script>
+  <script src="login.js" async></script>
+</body>
+</html>

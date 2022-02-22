@@ -1,0 +1,154 @@
+<!--
+  ~ Copyright (C) 2022. Gardel <sunxinao@hotmail.com> and contributors
+  ~
+  ~ This program is free software: you can redistribute it and/or modify
+  ~ it under the terms of the GNU Affero General Public License as published by
+  ~ the Free Software Foundation, either version 3 of the License, or
+  ~ (at your option) any later version.
+  ~
+  ~ This program is distributed in the hope that it will be useful,
+  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ~ GNU Affero General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU Affero General Public License
+  ~ along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  -->
+
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>角色信息</title>
+    <link rel="stylesheet" href="https://cdn.bootcss.com/normalize/8.0.0/normalize.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link href="https://cdn.bootcss.com/material-components-web/5.1.0/material-components-web.min.css" rel="stylesheet">
+    <script src="https://cdn.bootcss.com/material-components-web/5.1.0/material-components-web.min.js"></script>
+    <link rel="stylesheet" href="user.css">
+</head>
+<body>
+<noscript>You need to enable JavaScript to run this app.</noscript>
+<section class="header">
+    <h1>简陋信息页</h1>
+</section>
+
+<section class="header">
+    <h3>上传材质</h3>
+</section>
+
+<form id="upload-form" action="#" enctype="multipart/form-data">
+    <div class="mdc-form-field textureType">
+        <label>材质类别: </label>
+        <div id="radio-skin" class="mdc-radio">
+            <input class="mdc-radio__native-control" type="radio" id="radio-3" name="type" value="skin" checked>
+            <div class="mdc-radio__background">
+                <div class="mdc-radio__outer-circle"></div>
+                <div class="mdc-radio__inner-circle"></div>
+            </div>
+            <div class="mdc-radio__ripple"></div>
+        </div>
+        <label for="radio-3">皮肤</label>
+        <div id="radio-cape" class="mdc-radio">
+            <input class="mdc-radio__native-control" type="radio" id="radio-4" name="type" value="cape">
+            <div class="mdc-radio__background">
+                <div class="mdc-radio__outer-circle"></div>
+                <div class="mdc-radio__inner-circle"></div>
+            </div>
+            <div class="mdc-radio__ripple"></div>
+        </div>
+        <label for="radio-3">披风</label>
+    </div>
+    <div class="mdc-form-field model">
+        <label>材质模型: </label>
+        <div id="radio-steve" class="mdc-radio">
+            <input class="mdc-radio__native-control" type="radio" id="radio-1" name="model" value="default" checked>
+            <div class="mdc-radio__background">
+                <div class="mdc-radio__outer-circle"></div>
+                <div class="mdc-radio__inner-circle"></div>
+            </div>
+            <div class="mdc-radio__ripple"></div>
+        </div>
+        <label for="radio-1">Steve</label>
+        <div id="radio-alex" class="mdc-radio">
+            <input class="mdc-radio__native-control" type="radio" id="radio-2" name="model" value="slim">
+            <div class="mdc-radio__background">
+                <div class="mdc-radio__outer-circle"></div>
+                <div class="mdc-radio__inner-circle"></div>
+            </div>
+            <div class="mdc-radio__ripple"></div>
+        </div>
+        <label for="radio-2">Alex</label>
+    </div>
+    <div class="mdc-text-field url">
+        <input type="url" class="mdc-text-field__input" id="url-input" name="url">
+        <label class="mdc-floating-label" for="url-input">材质url</label>
+        <div class="mdc-line-ripple"></div>
+    </div>
+    <label class="mdc-text-field mdc-text-field--outlined mdc-text-field--with-trailing-icon file">
+        <input type="file" style="display: none;" accept="image/*" class="mdc-text-field__input" id="file-input"
+               name="file" aria-label="Label">
+
+        <i class="material-icons mdc-text-field__icon mdc-text-field__icon--trailing" tabindex="0" role="button"
+           onclick="$('#file-input').val('').change();">delete</i>
+        <div class="mdc-notched-outline">
+            <div class="mdc-notched-outline__leading"></div>
+            <div class="mdc-notched-outline__notch">
+                <label id="file-path" for="file-input" class="mdc-floating-label">或者选择一个图片</label>
+            </div>
+            <div class="mdc-notched-outline__trailing"></div>
+        </div>
+    </label>
+    <div class="button-container">
+        <button type="submit" class="mdc-button mdc-button--raised upload">
+            <div class="mdc-button__ripple"></div>
+            <span class="mdc-button__label">
+          上传
+        </span>
+        </button>
+        <button type="button" id="delete-btn" class="mdc-button mdc-button--raised upload">
+            <div class="mdc-button__ripple"></div>
+            <span class="mdc-button__label">
+          重置为默认
+        </span>
+        </button>
+    </div>
+</form>
+
+<section class="header">
+    <h3>更改游戏标签</h3>
+</section>
+
+<form id="change-form" action="#">
+    <div class="mdc-text-field changeTo">
+        <input type="text" class="mdc-text-field__input" id="changeTo-input" name="changeTo" required minlength="2"
+               maxlength="16">
+        <script>
+            if (localStorage.profileName) document.getElementById("changeTo-input").value = localStorage.profileName;
+        </script>
+        <label class="mdc-floating-label" for="changeTo-input">游戏标签</label>
+        <div class="mdc-line-ripple"></div>
+    </div>
+    <div class="button-container">
+        <button type="submit" class="mdc-button mdc-button--raised submit">
+            <div class="mdc-button__ripple"></div>
+            <span class="mdc-button__label">
+            更改
+          </span>
+        </button>
+    </div>
+</form>
+<div class="mdc-snackbar">
+    <div class="mdc-snackbar__surface">
+        <div class="mdc-snackbar__label"
+             role="status"
+             aria-live="polite">
+            上传失败
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.bootcss.com/jquery/3.5.0/jquery.min.js"></script>
+<script src="user.js" async></script>
+</body>
+</html>
