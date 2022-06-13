@@ -108,7 +108,6 @@ func main() {
 	serverMeta.Meta.Links.Register = meta.SkinRootUrl + "/profile/index.html"
 	serverMeta.SkinDomains = meta.SkinDomains
 	serverMeta.SignaturePublickey = string(publicKeyContent)
-	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	router.InitRouters(r, db, &serverMeta, meta.SkinRootUrl)
 	assetsFs, err := fs.Sub(f, "assets")

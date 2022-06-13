@@ -68,8 +68,7 @@ func (s *sessionRouterImpl) JoinServer(c *gin.Context) {
 func (s *sessionRouterImpl) HasJoinedServer(c *gin.Context) {
 	username := c.Query("username")
 	serverId := c.Query("serverId")
-	ip := c.DefaultQuery("ip",
-		c.Request.RemoteAddr[:strings.LastIndexByte(c.Request.RemoteAddr, ':')])
+	ip := c.Query("ip")
 	var textureBaseUrl string
 	if len(s.skinRootUrl) > 0 {
 		textureBaseUrl = strings.TrimRight(s.skinRootUrl, "/") + "/textures"

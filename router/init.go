@@ -49,6 +49,7 @@ func InitRouters(router *gin.Engine, db *gorm.DB, meta *ServerMeta, skinRootUrl 
 	textureRouter := NewTextureRouter(textureService)
 
 	router.GET("/", homeRouter.Home)
+	router.HEAD("/", homeRouter.Home)
 	authserver := router.Group("/authserver")
 	{
 		authserver.POST("/register", userRouter.Register)
