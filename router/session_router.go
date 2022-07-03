@@ -56,7 +56,7 @@ func (s *sessionRouterImpl) JoinServer(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusForbidden, util.NewForbiddenOperationError(err.Error()))
 		return
 	}
-	ip := c.Request.RemoteAddr[:strings.LastIndexByte(c.Request.RemoteAddr, ':')]
+	ip := c.ClientIP()
 	err = s.sessionService.JoinServer(request.AccessToken, request.ServerId, request.SelectedProfile, ip)
 	if err != nil {
 		util.HandleError(c, err)
