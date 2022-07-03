@@ -68,7 +68,7 @@ func (s *sessionStore) HasJoinedServer(serverId string, username string, ip stri
 	if value, ok := s.sessionCache.Get(serverId); ok {
 		if session, ok := value.(*model.AuthenticationSession); ok {
 			if !(session.HasExpired() && s.sessionCache.Remove(serverId)) &&
-				(ip == session.Ip) && (session.Token.SelectedProfile.Name == username) {
+				(ip == "" || ip == session.Ip) && (session.Token.SelectedProfile.Name == username) {
 				return session.Token.SelectedProfile.ToCompleteResponse(true, textureBaseUrl)
 			}
 		}
