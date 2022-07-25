@@ -27,7 +27,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	"gopkg.in/ini.v1"
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"io/fs"
 	"io/ioutil"
@@ -73,8 +73,9 @@ func main() {
 	pathSection := cfg.Section("paths")
 	privateKeyPath := pathSection.Key("private_key_file").MustString("private.pem")
 	publicKeyPath := pathSection.Key("public_key_file").MustString("public.pem")
-	databasePath := pathSection.Key("database_file").MustString("sqlite.db")
-	address := cfg.Section("server").Key("server_address").MustString(":8080")
+	serverSection := cfg.Section("server")
+	address := serverSection.Key("server_address").MustString(":8080")
+	databaseDsn := serverSection.Key("database_dsn").MustString("user:pass@tcp(127.0.0.1:3306)/yggdrasil?charset=utf8mb4&parseTime=True&loc=Local")
 	_, err = os.Stat(configFilePath)
 	if err != nil && os.IsNotExist(err) {
 		log.Println("配置文件不存在，已使用默认配置")
@@ -89,7 +90,7 @@ func main() {
 	if err != nil {
 		log.Fatal("无法读取公钥内容", err)
 	}
-	db, err := gorm.Open(sqlite.Open("file:"+databasePath+"?cache=shared"), &gorm.Config{
+	db, err := gorm.Open(mysql.Open(databaseDsn), &gorm.Config{
 		SkipDefaultTransaction: true,
 	})
 	if err != nil {
