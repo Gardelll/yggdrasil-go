@@ -33,6 +33,7 @@ type MetaInfo struct {
 	FeatureNonEmailLogin     bool `json:"feature.non_email_login,omitempty"`
 	FeatureLegacySkinApi     bool `json:"feature.legacy_skin_api,omitempty"`
 	FeatureNoMojangNamespace bool `json:"feature.no_mojang_namespace,omitempty"`
+	FeatureEnableProfileKey  bool `json:"feature.enable_profile_key,omitempty"`
 }
 
 type ServerMeta struct {

@@ -47,7 +47,11 @@ func NewSessionService(service TokenService) SessionService {
 
 func (s *sessionStore) JoinServer(accessToken string, serverId string, selectedProfile string, ip string) error {
 	token, ok := s.tokenService.GetToken(accessToken)
-	if ok && util.UnsignedString(token.SelectedProfile.Id) == selectedProfile {
+	if ok {
+		if token.GetAvailableLevel() != model.Valid ||
+			util.UnsignedString(token.SelectedProfile.Id) != selectedProfile {
+			return util.NewForbiddenOperationError(util.MessageInvalidToken)
+		}
 		session := model.NewAuthenticationSession(serverId, token, ip)
 		s.sessionCache.Add(serverId, &session)
 	} else {

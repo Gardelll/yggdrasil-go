@@ -76,4 +76,5 @@ func InitRouters(router *gin.Engine, db *gorm.DB, meta *ServerMeta, skinRootUrl 
 		api.DELETE("/user/profile/:uuid/:textureType", textureRouter.DeleteTexture)
 		api.GET("/users/profiles/minecraft/:username", userRouter.UsernameToUUID)
 	}
+	router.POST("/minecraftservices/player/certificates", userRouter.ProfileKey)
 }

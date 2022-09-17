@@ -104,6 +104,7 @@ func main() {
 	serverMeta.Meta.ImplementationName = meta.ImplementationName
 	serverMeta.Meta.ImplementationVersion = meta.ImplementationVersion
 	serverMeta.Meta.FeatureNoMojangNamespace = true
+	serverMeta.Meta.FeatureEnableProfileKey = true
 	serverMeta.Meta.Links.Homepage = meta.SkinRootUrl + "/profile/user.html"
 	serverMeta.Meta.Links.Register = meta.SkinRootUrl + "/profile/index.html"
 	serverMeta.SkinDomains = meta.SkinDomains
@@ -160,15 +161,18 @@ func checkRsaKeyFile(privateKeyPath string, publicKeyPath string) {
 			log.Fatalln("无法序列化 RSA 密钥", err)
 		}
 		err = pem.Encode(privatePem, &pem.Block{
-			Type:  "PRIVATE",
+			Type:  "PRIVATE KEY",
 			Bytes: privateKeyBytes,
 		})
 		if err != nil {
 			log.Fatalln("无法写入私钥文件", err)
 		}
-		publicKeyBytes := x509.MarshalPKCS1PublicKey(&privateKey.PublicKey)
+		publicKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+		if err != nil {
+			log.Fatalln("无法序列化 RSA 公钥", err)
+		}
 		err = pem.Encode(publicPem, &pem.Block{
-			Type:  "PUBLIC",
+			Type:  "PUBLIC KEY",
 			Bytes: publicKeyBytes,
 		})
 		if err != nil {

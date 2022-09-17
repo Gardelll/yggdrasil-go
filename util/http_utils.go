@@ -19,6 +19,7 @@ package util
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -138,28 +139,39 @@ func PostObjectForError(url string, data interface{}) error {
 	}
 }
 
-func PostForString(url string, data []byte) (string, error) {
+func PostForString(url string, accessToken string, data []byte, value interface{}) error {
 	reader := bytes.NewReader(data)
-	resp, err := http.Post(url, "application/json", reader)
+	request, err := http.NewRequestWithContext(context.Background(), "POST", url, reader)
 	if err != nil {
-		return "", err
+		return err
+	}
+	if accessToken != "" {
+		request.Header.Set("Authorization", "Bearer "+accessToken)
+	}
+	resp, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNoContent {
-		return "", nil
+		return nil
 	} else if resp.StatusCode/100 == 4 {
-		decoder := json.NewDecoder(resp.Body)
 		errResp := YggdrasilError{}
+		if resp.ContentLength <= 0 {
+			errResp.Status = resp.StatusCode
+			return errResp
+		}
+		decoder := json.NewDecoder(resp.Body)
 		err = decoder.Decode(&errResp)
 		if err != nil {
-			return "", err
+			return err
 		}
-		return "", errResp
+		return errResp
 	} else {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return "", err
+			return err
 		}
-		return string(body), nil
+		return json.Unmarshal(body, value)
 	}
 }

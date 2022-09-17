@@ -18,6 +18,11 @@
 package service
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	lru "github.com/hashicorp/golang-lru"
@@ -28,6 +33,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 	"yggdrasil-go/model"
 	"yggdrasil-go/util"
 )
@@ -43,6 +49,7 @@ type UserService interface {
 	UsernameToUUID(username string) (*model.ProfileResponse, error)
 	QueryUUIDs(usernames []string) ([]model.ProfileResponse, error)
 	QueryProfile(profileId uuid.UUID, unsigned bool, textureBaseUrl string) (map[string]interface{}, error)
+	ProfileKey(accessToken string) (*ProfileKeyResponse, error)
 }
 
 type LoginResponse struct {
@@ -53,23 +60,43 @@ type LoginResponse struct {
 	SelectedProfile   *model.ProfileResponse  `json:"selectedProfile"`
 }
 
-type userSrviceImpl struct {
-	tokenService  TokenService
-	db            *gorm.DB
-	limitLruCache *lru.Cache
+type ProfileKeyResponse struct {
+	ExpiresAt            time.Time       `json:"expiresAt,omitempty"`
+	KeyPair              *ProfileKeyPair `json:"keyPair,omitempty"`
+	PublicKeySignature   string          `json:"publicKeySignature,omitempty"`
+	PublicKeySignatureV2 string          `json:"publicKeySignatureV2,omitempty"`
+	RefreshedAfter       time.Time       `json:"refreshedAfter,omitempty"`
+}
+
+type ProfileKeyPair struct {
+	PrivateKey string `json:"privateKey,omitempty"`
+	PublicKey  string `json:"publicKey,omitempty"`
+}
+
+type userServiceImpl struct {
+	tokenService    TokenService
+	db              *gorm.DB
+	limitLruCache   *lru.Cache
+	profileKeyCache *lru.Cache
+	keyPairCh       chan ProfileKeyPair
 }
 
 func NewUserService(tokenService TokenService, db *gorm.DB) UserService {
-	cache, _ := lru.New(10000)
-	userSrvice := userSrviceImpl{
-		tokenService:  tokenService,
-		db:            db,
-		limitLruCache: cache,
+	cache0, _ := lru.New(10000)
+	cache1, _ := lru.New(10000)
+	ch := make(chan ProfileKeyPair, 100)
+	userService := userServiceImpl{
+		tokenService:    tokenService,
+		db:              db,
+		limitLruCache:   cache0,
+		profileKeyCache: cache1,
+		keyPairCh:       ch,
 	}
-	return &userSrvice
+	go userService.genKeyPair()
+	return &userService
 }
 
-func (u *userSrviceImpl) Register(username string, password string, profileName string) (*model.UserResponse, error) {
+func (u *userServiceImpl) Register(username string, password string, profileName string) (*model.UserResponse, error) {
 	var count int64
 	if err := u.db.Table("users").Where("email = ?", username).Count(&count).Error; err != nil {
 		return nil, err
@@ -117,7 +144,7 @@ func isInvalidProfileName(name string) bool {
 	//return name == "" || !name.matches("^[0-1a-zA-Z_]{2,16}$");
 }
 
-func (u *userSrviceImpl) Login(username string, password string, clientToken *string, requestUser bool) (*LoginResponse, error) {
+func (u *userServiceImpl) Login(username string, password string, clientToken *string, requestUser bool) (*LoginResponse, error) {
 	if !u.allowUser(username) {
 		return nil, util.YggdrasilError{
 			Status:       http.StatusTooManyRequests,
@@ -175,7 +202,7 @@ func (u *userSrviceImpl) Login(username string, password string, clientToken *st
 	}
 }
 
-func (u *userSrviceImpl) ChangeProfile(accessToken string, clientToken *string, changeTo string) error {
+func (u *userServiceImpl) ChangeProfile(accessToken string, clientToken *string, changeTo string) error {
 	if u.tokenService.VerifyToken(accessToken, clientToken) != model.Valid {
 		return util.NewForbiddenOperationError(util.MessageInvalidToken)
 	}
@@ -210,7 +237,7 @@ func (u *userSrviceImpl) ChangeProfile(accessToken string, clientToken *string, 
 	return nil
 }
 
-func (u *userSrviceImpl) Refresh(accessToken string, clientToken *string, requestUser bool, selectedProfile *model.ProfileResponse) (*LoginResponse, error) {
+func (u *userServiceImpl) Refresh(accessToken string, clientToken *string, requestUser bool, selectedProfile *model.ProfileResponse) (*LoginResponse, error) {
 	if len(accessToken) <= 36 {
 		user := model.User{}
 		if selectedProfile != nil {
@@ -259,7 +286,7 @@ func (u *userSrviceImpl) Refresh(accessToken string, clientToken *string, reques
 	}
 }
 
-func (u *userSrviceImpl) Validate(accessToken string, clientToken *string) error {
+func (u *userServiceImpl) Validate(accessToken string, clientToken *string) error {
 	if len(accessToken) <= 36 {
 		if u.tokenService.VerifyToken(accessToken, clientToken) != model.Valid {
 			return util.NewForbiddenOperationError(util.MessageInvalidToken)
@@ -280,7 +307,7 @@ func (u *userSrviceImpl) Validate(accessToken string, clientToken *string) error
 	}
 }
 
-func (u *userSrviceImpl) Invalidate(accessToken string) error {
+func (u *userServiceImpl) Invalidate(accessToken string) error {
 	if len(accessToken) <= 36 {
 		u.tokenService.RemoveAccessToken(accessToken)
 	} else {
@@ -295,7 +322,7 @@ func (u *userSrviceImpl) Invalidate(accessToken string) error {
 	return nil
 }
 
-func (u *userSrviceImpl) Signout(username string, password string) error {
+func (u *userServiceImpl) Signout(username string, password string) error {
 	if !u.allowUser(username) {
 		return util.YggdrasilError{
 			Status:       http.StatusTooManyRequests,
@@ -325,7 +352,7 @@ func (u *userSrviceImpl) Signout(username string, password string) error {
 	}
 }
 
-func (u *userSrviceImpl) UsernameToUUID(username string) (*model.ProfileResponse, error) {
+func (u *userServiceImpl) UsernameToUUID(username string) (*model.ProfileResponse, error) {
 	user := model.User{}
 	if result := u.db.Where("profile_name = ?", username).First(&user); result.Error == nil {
 		return &model.ProfileResponse{
@@ -342,7 +369,7 @@ func (u *userSrviceImpl) UsernameToUUID(username string) (*model.ProfileResponse
 	}
 }
 
-func (u *userSrviceImpl) QueryUUIDs(usernames []string) ([]model.ProfileResponse, error) {
+func (u *userServiceImpl) QueryUUIDs(usernames []string) ([]model.ProfileResponse, error) {
 	var users []model.User
 	var names []string
 	if len(usernames) > 10 {
@@ -362,7 +389,7 @@ func (u *userSrviceImpl) QueryUUIDs(usernames []string) ([]model.ProfileResponse
 	return responses, nil
 }
 
-func (u *userSrviceImpl) QueryProfile(profileId uuid.UUID, unsigned bool, textureBaseUrl string) (map[string]interface{}, error) {
+func (u *userServiceImpl) QueryProfile(profileId uuid.UUID, unsigned bool, textureBaseUrl string) (map[string]interface{}, error) {
 	user := model.User{}
 	if err := u.db.First(&user, profileId).Error; err == nil {
 		profile, err := user.Profile()
@@ -386,7 +413,35 @@ func (u *userSrviceImpl) QueryProfile(profileId uuid.UUID, unsigned bool, textur
 	}
 }
 
-func (u *userSrviceImpl) allowUser(username string) bool {
+func (u *userServiceImpl) ProfileKey(accessToken string) (resp *ProfileKeyResponse, err error) {
+	token, ok := u.tokenService.GetToken(accessToken)
+	if ok && token.GetAvailableLevel() == model.Valid {
+		resp = new(ProfileKeyResponse)
+		now := time.Now().UTC()
+		resp.RefreshedAfter = now
+		resp.ExpiresAt = now.Add(time.Hour * 24 * 90)
+		keyPair, err := u.getProfileKey(token.SelectedProfile.Id)
+		if err != nil {
+			return nil, err
+		}
+		resp.KeyPair = keyPair
+		signStr := fmt.Sprintf("%d%s", resp.ExpiresAt.UnixMilli(), keyPair.PublicKey)
+		sign, err := util.Sign(signStr)
+		if err != nil {
+			return nil, err
+		}
+		resp.PublicKeySignature = sign
+		resp.PublicKeySignatureV2 = sign
+	} else {
+		err = util.PostForString("https://api.minecraftservices.com/player/certificates", accessToken, []byte(""), resp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return resp, nil
+}
+
+func (u *userServiceImpl) allowUser(username string) bool {
 	if value, ok := u.limitLruCache.Get(username); ok {
 		if limiter, ok := value.(*rate.Limiter); ok {
 			return limiter.Allow()
@@ -398,6 +453,51 @@ func (u *userSrviceImpl) allowUser(username string) bool {
 		u.limitLruCache.Add(username, limiter)
 	}
 	return true
+}
+
+func (u *userServiceImpl) getProfileKey(profileId uuid.UUID) (*ProfileKeyPair, error) {
+	if value, ok := u.profileKeyCache.Get(profileId); ok {
+		if keyPair, ok := value.(*ProfileKeyPair); ok {
+			return keyPair, nil
+		}
+	}
+	if keyPair, ok := <-u.keyPairCh; ok {
+		u.profileKeyCache.Add(profileId, &keyPair)
+		return &keyPair, nil
+	} else {
+		return nil, errors.New("unable to generate rsa key pair")
+	}
+}
+
+func (u *userServiceImpl) genKeyPair() {
+	for {
+		keyPair := ProfileKeyPair{}
+		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		util.PrivateKey = privateKey
+		if err != nil {
+			close(u.keyPairCh)
+			panic(err)
+		}
+		privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+		if err != nil {
+			close(u.keyPairCh)
+			panic(err)
+		}
+		keyPair.PrivateKey = string(pem.EncodeToMemory(&pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: privateKeyBytes,
+		}))
+		publicKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+		if err != nil {
+			close(u.keyPairCh)
+			panic(err)
+		}
+		keyPair.PublicKey = string(pem.EncodeToMemory(&pem.Block{
+			Type:  "RSA PUBLIC KEY",
+			Bytes: publicKeyBytes,
+		}))
+		u.keyPairCh <- keyPair
+	}
 }
 
 func mojangUsernameToUUID(username string) (model.ProfileResponse, error) {

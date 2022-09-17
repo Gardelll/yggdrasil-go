@@ -37,6 +37,7 @@ type UserRouter interface {
 	UsernameToUUID(c *gin.Context)
 	QueryUUIDs(c *gin.Context)
 	QueryProfile(c *gin.Context)
+	ProfileKey(c *gin.Context)
 }
 
 type userRouterImpl struct {
@@ -257,6 +258,21 @@ func (u *userRouterImpl) QueryProfile(c *gin.Context) {
 		textureBaseUrl = c.Request.URL.Scheme + "://" + c.Request.URL.Hostname() + "/textures"
 	}
 	response, err := u.userService.QueryProfile(profileId, unsigned, textureBaseUrl)
+	if err != nil {
+		util.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, response)
+}
+
+func (u *userRouterImpl) ProfileKey(c *gin.Context) {
+	bearerToken := c.GetHeader("Authorization")
+	if len(bearerToken) < 8 {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, util.NewForbiddenOperationError(util.MessageInvalidToken))
+		return
+	}
+	accessToken := bearerToken[7:]
+	response, err := u.userService.ProfileKey(accessToken)
 	if err != nil {
 		util.HandleError(c, err)
 		return
