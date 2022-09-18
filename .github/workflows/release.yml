@@ -34,21 +34,23 @@ jobs:
           tags: nomsgpack sqlite mysql
           trimpath: true
 
-      - name: Prepare package
-        run: cp -v ./config_example.ini ./build
-
       - name: Create ZIP archive
         run: |
+          cp -v ./config_example.ini ./build || exit 1
           pushd build || exit 1
-          ls -alh
-          zip -9vr ../yggdrasil.zip .
+          ls -1 yggdrasil-* | while read LINE; do
+          PREFIX="${LINE%.*}"
+          SUFFIX="$(echo "$LINE" | grep -osE '\.\w+' || printf '')"
+          cp -v "$LINE" "yggdrasil$SUFFIX"
+          FILE="../$PREFIX.zip"
+          zip -9v "$FILE" "yggdrasil$SUFFIX" *.ini
+          DGST="$FILE.dgst"
+          openssl dgst -md5    "$FILE" | sed 's/([^)]*)//g' >>"$DGST"
+          openssl dgst -sha1   "$FILE" | sed 's/([^)]*)//g' >>"$DGST"
+          openssl dgst -sha256 "$FILE" | sed 's/([^)]*)//g' >>"$DGST"
+          openssl dgst -sha512 "$FILE" | sed 's/([^)]*)//g' >>"$DGST"
+          done
           popd || exit 1
-          FILE=./yggdrasil.zip
-          DGST=$FILE.dgst
-          openssl dgst -md5    $FILE | sed 's/([^)]*)//g' >>$DGST
-          openssl dgst -sha1   $FILE | sed 's/([^)]*)//g' >>$DGST
-          openssl dgst -sha256 $FILE | sed 's/([^)]*)//g' >>$DGST
-          openssl dgst -sha512 $FILE | sed 's/([^)]*)//g' >>$DGST
 
       - name: Upload files to GitHub release
         uses: softprops/action-gh-release@v1
@@ -57,4 +59,4 @@ jobs:
           prerelease: true
           body: For test only
           name: ${{ github.ref_name }} Pre Release
-          files: yggdrasil.zip*
+          files: yggdrasil*.zip*
