@@ -473,7 +473,6 @@ func (u *userServiceImpl) genKeyPair() {
 	for {
 		keyPair := ProfileKeyPair{}
 		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-		util.PrivateKey = privateKey
 		if err != nil {
 			close(u.keyPairCh)
 			panic(err)

@@ -1,5 +1,5 @@
 GO_CMD ?= go
-GO_BUILD = $(GO_CMD) build
+GO_BUILD = $(GO_CMD) build -trimpath -ldflags "-s -w"
 GO_CLEAN = $(GO_CMD) clean
 GO_TEST = $(GO_CMD) test
 GO_GET = $(GO_CMD) get
@@ -12,6 +12,9 @@ default: $(BINARY)
 
 $(BINARY):
 	$(GO_BUILD) -tags=nomsgpack -o $(BINARY)
+
+get:
+	$(GO_GET)
 
 package:$(BINARY)
 	tar -zcf $(PACKAGE_NAME) $(BINARY) config_example.ini

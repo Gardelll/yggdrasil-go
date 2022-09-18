@@ -25,7 +25,7 @@ import (
 )
 
 type User struct {
-	ID                 uuid.UUID `gorm:"column:id;type:bytes;size:36;primaryKey"`
+	ID                 uuid.UUID `gorm:"column:id;type:string;size:36;primaryKey"`
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	Email              string   `gorm:"size:64;uniqueIndex:email_idx"`

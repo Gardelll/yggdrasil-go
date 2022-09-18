@@ -27,7 +27,6 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	"gopkg.in/ini.v1"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"io/fs"
 	"io/ioutil"
@@ -70,15 +69,23 @@ func main() {
 	if err != nil {
 		log.Fatal("无法读取配置文件", err)
 	}
+	dbCfg := util.DbCfg{
+		DatabaseDriver: "sqlite",
+		DatabaseDsn:    "file:sqlite.db?cache=shared",
+	}
+	err = cfg.Section("database").MapTo(&dbCfg)
+	if err != nil {
+		log.Fatal("无法读取配置文件", err)
+	}
 	pathSection := cfg.Section("paths")
 	privateKeyPath := pathSection.Key("private_key_file").MustString("private.pem")
 	publicKeyPath := pathSection.Key("public_key_file").MustString("public.pem")
-	databasePath := pathSection.Key("database_file").MustString("sqlite.db")
 	address := cfg.Section("server").Key("server_address").MustString(":8080")
 	_, err = os.Stat(configFilePath)
 	if err != nil && os.IsNotExist(err) {
 		log.Println("配置文件不存在，已使用默认配置")
 		_ = cfg.Section("meta").ReflectFrom(&meta)
+		_ = cfg.Section("database").ReflectFrom(&dbCfg)
 		err = cfg.SaveToIndent(configFilePath, " ")
 		if err != nil {
 			log.Println("警告: 无法保存配置文件", err)
@@ -89,7 +96,7 @@ func main() {
 	if err != nil {
 		log.Fatal("无法读取公钥内容", err)
 	}
-	db, err := gorm.Open(sqlite.Open("file:"+databasePath+"?cache=shared"), &gorm.Config{
+	db, err := gorm.Open(util.GetDialector(dbCfg), &gorm.Config{
 		SkipDefaultTransaction: true,
 	})
 	if err != nil {
