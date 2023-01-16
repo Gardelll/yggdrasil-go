@@ -26,3 +26,10 @@
 
 注册地址在 `/profile/index.html`。
 
+## Docker
+
+使用 docker 快速上手：
+
+```shell
+docker run -d --name yggdrasil-go -v $(pwd)/data:/app/data -p 8080:8080 gardel/yggdrasil-go:latest
+```

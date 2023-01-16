@@ -35,6 +35,7 @@ jobs:
           trimpath: true
 
       - name: Create ZIP archive
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           cp -v ./config_example.ini ./build || exit 1
           pushd build || exit 1
@@ -60,3 +61,24 @@ jobs:
           body: For test only
           name: ${{ github.ref_name }} Pre Release
           files: yggdrasil*.zip*
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        if: startsWith(github.ref, 'refs/tags/')
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        if: startsWith(github.ref, 'refs/tags/')
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v3
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: gardel/yggdrasil-go:latest, gardel/yggdrasil-go:${{ github.ref_name }}
