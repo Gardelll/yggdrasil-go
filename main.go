@@ -29,7 +29,6 @@ import (
 	"gopkg.in/ini.v1"
 	"gorm.io/gorm"
 	"io/fs"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -50,6 +49,11 @@ type MetaCfg struct {
 	ImplementationVersion string   `ini:"implementation_version"`
 	SkinDomains           []string `ini:"skin_domains"`
 	SkinRootUrl           string   `ini:"skin_root_url"`
+}
+
+type ServerCfg struct {
+	ServerAddress  string   `ini:"server_address"`
+	TrustedProxies []string `ini:"trusted_proxies"`
 }
 
 func main() {
@@ -80,19 +84,32 @@ func main() {
 	pathSection := cfg.Section("paths")
 	privateKeyPath := pathSection.Key("private_key_file").MustString("private.pem")
 	publicKeyPath := pathSection.Key("public_key_file").MustString("public.pem")
-	address := cfg.Section("server").Key("server_address").MustString(":8080")
+	serverCfg := ServerCfg{
+		ServerAddress: ":8080",
+		TrustedProxies: []string{
+			"127.0.0.0/8",
+			"10.0.0.0/8",
+			"192.168.0.0/16",
+			"172.16.0.0/12",
+		},
+	}
+	err = cfg.Section("server").MapTo(&serverCfg)
+	if err != nil {
+		log.Fatal("无法读取配置文件", err)
+	}
 	_, err = os.Stat(configFilePath)
 	if err != nil && os.IsNotExist(err) {
 		log.Println("配置文件不存在，已使用默认配置")
 		_ = cfg.Section("meta").ReflectFrom(&meta)
 		_ = cfg.Section("database").ReflectFrom(&dbCfg)
+		_ = cfg.Section("server").ReflectFrom(&serverCfg)
 		err = cfg.SaveToIndent(configFilePath, " ")
 		if err != nil {
 			log.Println("警告: 无法保存配置文件", err)
 		}
 	}
 	checkRsaKeyFile(privateKeyPath, publicKeyPath)
-	publicKeyContent, err := ioutil.ReadFile(publicKeyPath)
+	publicKeyContent, err := os.ReadFile(publicKeyPath)
 	if err != nil {
 		log.Fatal("无法读取公钥内容", err)
 	}
@@ -117,6 +134,10 @@ func main() {
 	serverMeta.SkinDomains = meta.SkinDomains
 	serverMeta.SignaturePublickey = string(publicKeyContent)
 	r := gin.Default()
+	err = r.SetTrustedProxies(serverCfg.TrustedProxies)
+	if err != nil {
+		log.Fatal(err)
+	}
 	router.InitRouters(r, db, &serverMeta, meta.SkinRootUrl)
 	assetsFs, err := fs.Sub(f, "assets")
 	if err != nil {
@@ -124,7 +145,7 @@ func main() {
 	}
 	r.StaticFS("/profile", http.FS(assetsFs))
 	srv := &http.Server{
-		Addr:    address,
+		Addr:    serverCfg.ServerAddress,
 		Handler: r,
 	}
 	go func() {

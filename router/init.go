@@ -26,10 +26,6 @@ import (
 )
 
 func InitRouters(router *gin.Engine, db *gorm.DB, meta *ServerMeta, skinRootUrl string) {
-	err := router.SetTrustedProxies([]string{"127.0.0.1"})
-	if err != nil {
-		panic(err)
-	}
 	router.Use(cors.New(cors.Config{
 		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "HEAD"},
