@@ -16,6 +16,12 @@ $(BINARY):
 get:
 	$(GO_GET)
 
+assets:
+	mkdir -p assets
+	yarn --cwd frontend install --frozen-lockfile --non-interactive
+	yarn --cwd frontend build
+	cp -r frontend/dist/. assets/
+
 package:$(BINARY)
 	tar -zcf $(PACKAGE_NAME) $(BINARY) config_example.ini
 

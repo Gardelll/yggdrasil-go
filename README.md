@@ -24,7 +24,7 @@
 
 启动成功后在启动器（请使用第三方启动器）外置登录选项上填写运行的 URL 的根路径，比如 `http://localhost:8080`。
 
-注册地址在 `/profile/index.html`。
+注册地址在 `/profile/`。
 
 ## Docker
 

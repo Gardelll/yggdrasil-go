@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2023. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,34 +15,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-
-.header {
-  text-align: center;
+export type AppState = {
+    login: boolean
+    accessToken: string
+    tokenValid: boolean
+    loginTime: number
+    profileName: string
+    uuid: string
 }
-
-.model,
-.textureType,
-.url,
-.changeTo {
-  display: block;
-  width: 300px;
-  margin: 20px auto;
-}
-
-.file {
-    display: flex;
-    width: 300px;
-    margin: 20px auto;
-}
-
-.button-container {
-  display: flex;
-  justify-content: flex-end;
-  width: 300px;
-  margin: auto;
-}
-
-.button-container button {
-  margin: 3px;
-}
-

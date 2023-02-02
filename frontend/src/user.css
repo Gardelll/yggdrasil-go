@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2023. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,37 +15,39 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-html, body {
-  height: 100%;
-}
-
-body {
-  font-family: 'Roboto';
-  margin: 0;
-  padding-top: 0.1px;
-}
 
 .header {
-  text-align: center;
+    text-align: center;
 }
 
-.username,
-.profileName,
-.password,
-.profileName-helper,
-.password-helper {
-  display: block;
-  width: 300px;
-  margin: 20px auto;
+.user-card {
+    padding: 14px 24px;
+    margin: auto;
+}
+
+.model,
+.textureType,
+.url,
+.changeTo {
+    display: block;
+    width: 87%;
+    margin: 20px auto;
+}
+
+.file {
+    display: flex;
+    width: 87%;
+    margin: 20px auto;
 }
 
 .button-container {
-  display: flex;
-  justify-content: flex-end;
-  width: 300px;
-  margin: auto;
+    display: flex;
+    justify-content: flex-end;
+    width: 87%;
+    margin: auto;
 }
 
 .button-container button {
-  margin: 3px;
+    margin: 3px;
 }
+

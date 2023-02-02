@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2022-2023. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -129,8 +129,8 @@ func main() {
 	serverMeta.Meta.ImplementationVersion = meta.ImplementationVersion
 	serverMeta.Meta.FeatureNoMojangNamespace = true
 	serverMeta.Meta.FeatureEnableProfileKey = true
-	serverMeta.Meta.Links.Homepage = meta.SkinRootUrl + "/profile/user.html"
-	serverMeta.Meta.Links.Register = meta.SkinRootUrl + "/profile/index.html"
+	serverMeta.Meta.Links.Homepage = meta.SkinRootUrl + "/profile/"
+	serverMeta.Meta.Links.Register = meta.SkinRootUrl + "/profile/"
 	serverMeta.SkinDomains = meta.SkinDomains
 	serverMeta.SignaturePublickey = string(publicKeyContent)
 	r := gin.Default()
