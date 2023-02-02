@@ -65,7 +65,7 @@ func main() {
 	meta := MetaCfg{
 		ServerName:            "A Mojang Yggdrasil Server",
 		ImplementationName:    "go-yggdrasil-server",
-		ImplementationVersion: "v0.1",
+		ImplementationVersion: "v0.0.1",
 		SkinDomains:           []string{".example.com", "localhost"},
 		SkinRootUrl:           "http://localhost:8080",
 	}
