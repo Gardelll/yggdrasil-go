@@ -45,14 +45,14 @@ jobs:
       - name: Create ZIP archive
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          cp -v ./config_example.ini ./build || exit 1
+          cp -v ./config_example.ini ./assets ./build/ || exit 1
           pushd build || exit 1
           ls -1 yggdrasil-* | while read LINE; do
           PREFIX="${LINE%.*}"
           SUFFIX="$(echo "$LINE" | grep -osE '\.\w+' || printf '')"
           cp -v "$LINE" "yggdrasil$SUFFIX"
           FILE="../$PREFIX.zip"
-          zip -9v "$FILE" "yggdrasil$SUFFIX" *.ini
+          zip -9v "$FILE" "yggdrasil$SUFFIX" *.ini assets
           DGST="$FILE.dgst"
           openssl dgst -md5    "$FILE" | sed 's/([^)]*)//g' >>"$DGST"
           openssl dgst -sha1   "$FILE" | sed 's/([^)]*)//g' >>"$DGST"

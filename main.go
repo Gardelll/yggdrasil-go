@@ -22,13 +22,11 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"embed"
 	"encoding/pem"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"gopkg.in/ini.v1"
 	"gorm.io/gorm"
-	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -39,9 +37,6 @@ import (
 	"yggdrasil-go/router"
 	"yggdrasil-go/util"
 )
-
-//go:embed assets/*
-var f embed.FS
 
 type MetaCfg struct {
 	ServerName            string   `ini:"server_name"`
@@ -139,11 +134,7 @@ func main() {
 		log.Fatal(err)
 	}
 	router.InitRouters(r, db, &serverMeta, meta.SkinRootUrl)
-	assetsFs, err := fs.Sub(f, "assets")
-	if err != nil {
-		log.Fatal(err)
-	}
-	r.StaticFS("/profile", http.FS(assetsFs))
+	r.Static("/profile", "assets")
 	srv := &http.Server{
 		Addr:    serverCfg.ServerAddress,
 		Handler: r,
