@@ -178,28 +178,10 @@ func (u *userServiceImpl) Login(username string, password string, clientToken *s
 				response.User = &userResponse
 			}
 			return &response, nil
-		} else {
-			return nil, util.NewForbiddenOperationError(util.MessageInvalidCredentials)
-		}
-	} else {
-		data := map[string]interface{}{
-			"agent": map[string]interface{}{
-				"name":    "Minecraft",
-				"version": 1,
-			},
-			"username":    username,
-			"password":    password,
-			"clientToken": password,
-			"requestUser": requestUser,
-		}
-		loginResponse := LoginResponse{}
-		err := util.PostObject("https://authserver.mojang.com/authenticate", data, &loginResponse)
-		if err != nil {
-			return nil, err
-		} else {
-			return &loginResponse, nil
 		}
 	}
+
+	return nil, util.NewForbiddenOperationError(util.MessageInvalidCredentials)
 }
 
 func (u *userServiceImpl) ChangeProfile(accessToken string, clientToken *string, changeTo string) error {
