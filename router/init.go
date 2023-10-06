@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2022-2023. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -72,5 +72,9 @@ func InitRouters(router *gin.Engine, db *gorm.DB, meta *ServerMeta, skinRootUrl 
 		api.DELETE("/user/profile/:uuid/:textureType", textureRouter.DeleteTexture)
 		api.GET("/users/profiles/minecraft/:username", userRouter.UsernameToUUID)
 	}
-	router.POST("/minecraftservices/player/certificates", userRouter.ProfileKey)
+	minecraftservices := router.Group("/minecraftservices")
+	{
+		minecraftservices.POST("/player/certificates", userRouter.ProfileKey)
+		minecraftservices.GET("/publickeys", homeRouter.PublicKeys)
+	}
 }
