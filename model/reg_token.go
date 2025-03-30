@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,12 +15,27 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-export type AppState = {
-    login: string
-    accessToken: string
-    tokenValid: boolean
-    loginTime: number
-    profileName: string
-    uuid: string
-    passwordReset: boolean
+package model
+
+import (
+	"time"
+	"yggdrasil-go/util"
+)
+
+type RegToken struct {
+	createAt    int64
+	AccessToken string
+	Email       string
+}
+
+func NewRegToken(email string) (this RegToken) {
+	this.Email = email
+	this.AccessToken = util.RandomUUID()
+	this.createAt = time.Now().UnixMilli()
+	return this
+}
+
+func (t *RegToken) IsValid() bool {
+	d := time.Now().Sub(time.UnixMilli(t.createAt))
+	return d < 10*time.Minute
 }

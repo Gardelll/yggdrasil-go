@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2023. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2022-2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -25,7 +25,7 @@ import (
 	"yggdrasil-go/service"
 )
 
-func InitRouters(router *gin.Engine, db *gorm.DB, meta *ServerMeta, skinRootUrl string) {
+func InitRouters(router *gin.Engine, db *gorm.DB, meta *ServerMeta, smtpCfg *service.SmtpConfig, skinRootUrl string) {
 	router.Use(cors.New(cors.Config{
 		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "HEAD"},
@@ -36,7 +36,8 @@ func InitRouters(router *gin.Engine, db *gorm.DB, meta *ServerMeta, skinRootUrl 
 	}))
 
 	tokenService := service.NewTokenService()
-	userService := service.NewUserService(tokenService, db)
+	regTokenService := service.NewRegTokenService(smtpCfg)
+	userService := service.NewUserService(tokenService, regTokenService, db)
 	sessionService := service.NewSessionService(tokenService)
 	textureService := service.NewTextureService(tokenService, db)
 	homeRouter := NewHomeRouter(meta)
@@ -46,6 +47,7 @@ func InitRouters(router *gin.Engine, db *gorm.DB, meta *ServerMeta, skinRootUrl 
 
 	router.GET("/", homeRouter.Home)
 	router.HEAD("/", homeRouter.Home)
+	router.GET("/yggdrasil", homeRouter.Home)
 	authserver := router.Group("/authserver")
 	{
 		authserver.POST("/register", userRouter.Register)
@@ -55,6 +57,9 @@ func InitRouters(router *gin.Engine, db *gorm.DB, meta *ServerMeta, skinRootUrl 
 		authserver.POST("/validate", userRouter.Validate)
 		authserver.POST("/invalidate", userRouter.Invalidate)
 		authserver.POST("/signout", userRouter.Signout)
+		authserver.POST("/sendEmail", userRouter.SendEmail)
+		authserver.GET("/verifyEmail", userRouter.VerifyEmail)
+		authserver.POST("/resetPassword", userRouter.ResetPassword)
 	}
 	router.GET("/users/profiles/minecraft/:username", userRouter.UsernameToUUID)
 	sessionserver := router.Group("/sessionserver/session/minecraft")
@@ -76,5 +81,8 @@ func InitRouters(router *gin.Engine, db *gorm.DB, meta *ServerMeta, skinRootUrl 
 	{
 		minecraftservices.POST("/player/certificates", userRouter.ProfileKey)
 		minecraftservices.GET("/publickeys", homeRouter.PublicKeys)
+		minecraftservices.GET("/minecraft/profile/lookup/:uuid", userRouter.UUIDToUUID)
+		minecraftservices.GET("/minecraft/profile/lookup/name/:username", userRouter.UsernameToUUID)
+		minecraftservices.POST("/minecraft/profile/lookup/bulk/byname", userRouter.QueryUUIDs)
 	}
 }

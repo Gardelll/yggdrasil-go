@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2022-2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -39,7 +39,7 @@ import (
 )
 
 type UserService interface {
-	Register(username string, password string, profileName string) (*model.UserResponse, error)
+	Register(username, password, profileName, ip string) (*model.UserResponse, error)
 	Login(username string, password string, clientToken *string, requestUser bool) (*LoginResponse, error)
 	ChangeProfile(accessToken string, clientToken *string, changeTo string) error
 	Refresh(accessToken string, clientToken *string, requestUser bool, selectedProfile *model.ProfileResponse) (*LoginResponse, error)
@@ -47,9 +47,13 @@ type UserService interface {
 	Invalidate(accessToken string) error
 	Signout(username string, password string) error
 	UsernameToUUID(username string) (*model.ProfileResponse, error)
+	UUIDToUUID(profileId uuid.UUID) (*model.ProfileResponse, error)
 	QueryUUIDs(usernames []string) ([]model.ProfileResponse, error)
 	QueryProfile(profileId uuid.UUID, unsigned bool, textureBaseUrl string) (map[string]interface{}, error)
 	ProfileKey(accessToken string) (*ProfileKeyResponse, error)
+	SendEmail(email string, tokenType RegTokenType, ip string) error
+	VerifyEmail(accessToken string) error
+	ResetPassword(email string, password string, accessToken string) error
 }
 
 type LoginResponse struct {
@@ -75,18 +79,20 @@ type ProfileKeyPair struct {
 
 type userServiceImpl struct {
 	tokenService    TokenService
+	regTokenService RegTokenService
 	db              *gorm.DB
 	limitLruCache   *lru.Cache
 	profileKeyCache *lru.Cache
 	keyPairCh       chan ProfileKeyPair
 }
 
-func NewUserService(tokenService TokenService, db *gorm.DB) UserService {
+func NewUserService(tokenService TokenService, regTokenService RegTokenService, db *gorm.DB) UserService {
 	cache0, _ := lru.New(10000)
 	cache1, _ := lru.New(10000)
 	ch := make(chan ProfileKeyPair, 100)
 	userService := userServiceImpl{
 		tokenService:    tokenService,
+		regTokenService: regTokenService,
 		db:              db,
 		limitLruCache:   cache0,
 		profileKeyCache: cache1,
@@ -96,7 +102,7 @@ func NewUserService(tokenService TokenService, db *gorm.DB) UserService {
 	return &userService
 }
 
-func (u *userServiceImpl) Register(username string, password string, profileName string) (*model.UserResponse, error) {
+func (u *userServiceImpl) Register(username, password, profileName, ip string) (*model.UserResponse, error) {
 	var count int64
 	if err := u.db.Table("users").Where("email = ?", username).Count(&count).Error; err != nil {
 		return nil, err
@@ -134,6 +140,7 @@ func (u *userServiceImpl) Register(username string, password string, profileName
 	if err := u.db.Create(&user).Error; err != nil {
 		return nil, err
 	}
+	_ = u.SendEmail(user.Email, RegisterToken, ip)
 	response := user.ToResponse()
 	return &response, nil
 }
@@ -155,6 +162,9 @@ func (u *userServiceImpl) Login(username string, password string, clientToken *s
 	user := model.User{}
 	if err := u.db.Where("email = ?", username).First(&user).Error; err == nil {
 		if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)) == nil {
+			if !user.EmailVerified {
+				return nil, util.NewForbiddenOperationError("Email not verified")
+			}
 			var useClientToken string
 			if clientToken == nil || *clientToken == "" {
 				useClientToken = util.RandomUUID()
@@ -252,56 +262,24 @@ func (u *userServiceImpl) Refresh(accessToken string, clientToken *string, reque
 		}
 		return &response, nil
 	} else {
-		data := map[string]interface{}{
-			"accessToken":     accessToken,
-			"clientToken":     clientToken,
-			"requestUser":     requestUser,
-			"selectedProfile": selectedProfile,
-		}
-		loginResponse := LoginResponse{}
-		err := util.PostObject("https://authserver.mojang.com/refresh", data, &loginResponse)
-		if err != nil {
-			return nil, err
-		} else {
-			return &loginResponse, nil
-		}
+		return nil, util.NewForbiddenOperationError(util.MessageInvalidToken)
 	}
 }
 
 func (u *userServiceImpl) Validate(accessToken string, clientToken *string) error {
-	if len(accessToken) <= 36 {
-		if u.tokenService.VerifyToken(accessToken, clientToken) != model.Valid {
-			return util.NewForbiddenOperationError(util.MessageInvalidToken)
-		} else {
-			return nil
-		}
+	if len(accessToken) <= 36 && u.tokenService.VerifyToken(accessToken, clientToken) == model.Valid {
+		return nil
 	} else {
-		data := map[string]interface{}{
-			"accessToken": accessToken,
-			"clientToken": clientToken,
-		}
-		err := util.PostObjectForError("https://authserver.mojang.com/validate", data)
-		if err != nil {
-			return err
-		} else {
-			return nil
-		}
+		return util.NewForbiddenOperationError(util.MessageInvalidToken)
 	}
 }
 
 func (u *userServiceImpl) Invalidate(accessToken string) error {
 	if len(accessToken) <= 36 {
 		u.tokenService.RemoveAccessToken(accessToken)
-	} else {
-		data := map[string]interface{}{
-			"accessToken": accessToken,
-		}
-		err := util.PostObjectForError("https://authserver.mojang.com/invalidate", data)
-		if err != nil {
-			return err
-		}
+		return nil
 	}
-	return nil
+	return util.NewForbiddenOperationError(util.MessageInvalidToken)
 }
 
 func (u *userServiceImpl) Signout(username string, password string) error {
@@ -317,21 +295,9 @@ func (u *userServiceImpl) Signout(username string, password string) error {
 		if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)) == nil {
 			u.tokenService.RemoveAll(user.ID)
 			return nil
-		} else {
-			return util.NewForbiddenOperationError(util.MessageInvalidCredentials)
-		}
-	} else {
-		data := map[string]interface{}{
-			"username": username,
-			"password": password,
-		}
-		err := util.PostObjectForError("https://authserver.mojang.com/signout", data)
-		if err != nil {
-			return err
-		} else {
-			return nil
 		}
 	}
+	return util.NewForbiddenOperationError(util.MessageInvalidCredentials)
 }
 
 func (u *userServiceImpl) UsernameToUUID(username string) (*model.ProfileResponse, error) {
@@ -351,6 +317,23 @@ func (u *userServiceImpl) UsernameToUUID(username string) (*model.ProfileRespons
 	}
 }
 
+func (u *userServiceImpl) UUIDToUUID(profileId uuid.UUID) (*model.ProfileResponse, error) {
+	user := model.User{}
+	if result := u.db.First(&user, profileId); result.Error == nil {
+		return &model.ProfileResponse{
+			Name: user.ProfileName,
+			Id:   util.UnsignedString(user.ID),
+		}, nil
+	} else {
+		response, err := mojangUUIDToUUID(util.UnsignedString(profileId))
+		if err != nil {
+			return nil, nil
+		} else {
+			return &response, nil
+		}
+	}
+}
+
 func (u *userServiceImpl) QueryUUIDs(usernames []string) ([]model.ProfileResponse, error) {
 	var users []model.User
 	var names []string
@@ -359,13 +342,27 @@ func (u *userServiceImpl) QueryUUIDs(usernames []string) ([]model.ProfileRespons
 	} else {
 		names = usernames
 	}
-	var responses = make([]model.ProfileResponse, 0)
+	responses := make([]model.ProfileResponse, 0)
+	notFoundUsers := make([]string, 0)
+	foundUsernames := make(map[string]bool)
 	if err := u.db.Table("users").Where("profile_name in ?", names).Find(&users).Error; err == nil {
 		for _, user := range users {
 			responses = append(responses, model.ProfileResponse{
 				Name: user.ProfileName,
 				Id:   util.UnsignedString(user.ID),
 			})
+			foundUsernames[user.ProfileName] = true
+		}
+		for _, name := range names {
+			if !foundUsernames[name] {
+				notFoundUsers = append(notFoundUsers, name)
+			}
+		}
+	}
+	if len(notFoundUsers) > 0 {
+		mojangResponses, _ := mojangUsernamesToUUIDs(notFoundUsers)
+		for _, resp := range mojangResponses {
+			responses = append(responses, resp)
 		}
 	}
 	return responses, nil
@@ -423,6 +420,66 @@ func (u *userServiceImpl) ProfileKey(accessToken string) (resp *ProfileKeyRespon
 	return resp, nil
 }
 
+func (u *userServiceImpl) SendEmail(email string, tokenType RegTokenType, ip string) error {
+	if !u.allowEmail("ip:"+ip) || !u.allowEmail("email:"+email) {
+		return util.YggdrasilError{
+			Status:       http.StatusTooManyRequests,
+			ErrorCode:    "ForbiddenOperationException",
+			ErrorMessage: "Forbidden",
+		}
+	}
+	var count int64
+	if err := u.db.Table("users").Where("email = ?", email).Count(&count).Error; err != nil {
+		return util.NewIllegalArgumentError(err.Error())
+	}
+	if count == 0 {
+		return util.NewForbiddenOperationError("user not found")
+	}
+	return u.regTokenService.SendTokenEmail(tokenType, email)
+}
+
+func (u *userServiceImpl) VerifyEmail(accessToken string) error {
+	email, err := u.regTokenService.VerifyToken(accessToken)
+	if err != nil {
+		return err
+	}
+
+	user := model.User{}
+	err = u.db.Where("email = ?", email).First(&user).Error
+	if err != nil {
+		return util.NewIllegalArgumentError("user not found")
+	}
+
+	user.EmailVerified = true
+	return u.db.Model(&user).Update("email_verified", user.EmailVerified).Error
+}
+
+func (u *userServiceImpl) ResetPassword(email string, password string, accessToken string) error {
+	user := model.User{}
+	err := u.db.Where("email = ?", email).First(&user).Error
+	if err != nil {
+		return util.NewIllegalArgumentError("user not found")
+	}
+	tokenEmail, err := u.regTokenService.VerifyToken(accessToken)
+	if err != nil {
+		return err
+	}
+	if tokenEmail != email {
+		return util.NewIllegalArgumentError("email invalid")
+	}
+
+	if len(password) < 6 {
+		return util.NewIllegalArgumentError("bad format(password longer than 5)")
+	}
+	hashedPass, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	user.Password = string(hashedPass)
+	user.EmailVerified = true
+	return u.db.Model(&user).Updates(model.User{
+		EmailVerified: user.EmailVerified,
+		Password:      user.Password,
+	}).Error
+}
+
 func (u *userServiceImpl) allowUser(username string) bool {
 	if value, ok := u.limitLruCache.Get(username); ok {
 		if limiter, ok := value.(*rate.Limiter); ok {
@@ -433,6 +490,20 @@ func (u *userServiceImpl) allowUser(username string) bool {
 	} else {
 		limiter := rate.NewLimiter(0.2, 3)
 		u.limitLruCache.Add(username, limiter)
+	}
+	return true
+}
+
+func (u *userServiceImpl) allowEmail(key string) bool {
+	if value, ok := u.limitLruCache.Get(key); ok {
+		if limiter, ok := value.(*rate.Limiter); ok {
+			return limiter.Allow()
+		} else {
+			u.limitLruCache.Remove(key)
+		}
+	} else {
+		limiter := rate.NewLimiter(0.02, 1)
+		u.limitLruCache.Add(key, limiter)
 	}
 	return true
 }
@@ -483,8 +554,29 @@ func (u *userServiceImpl) genKeyPair() {
 
 func mojangUsernameToUUID(username string) (model.ProfileResponse, error) {
 	response := model.ProfileResponse{}
-	reqUrl := fmt.Sprintf("https://api.mojang.com/users/profiles/minecraft/%s", url.PathEscape(username))
+	reqUrl := fmt.Sprintf("https://api.minecraftservices.com/minecraft/profile/lookup/name/%s", url.PathEscape(username))
 	err := util.GetObject(reqUrl, &response)
+	if err != nil {
+		return response, err
+	} else {
+		return response, nil
+	}
+}
+
+func mojangUUIDToUUID(uid string) (model.ProfileResponse, error) {
+	response := model.ProfileResponse{}
+	reqUrl := fmt.Sprintf("https://api.minecraftservices.com/minecraft/profile/lookup/%s", uid)
+	err := util.GetObject(reqUrl, &response)
+	if err != nil {
+		return response, err
+	} else {
+		return response, nil
+	}
+}
+
+func mojangUsernamesToUUIDs(username []string) ([]model.ProfileResponse, error) {
+	response := make([]model.ProfileResponse, 0)
+	err := util.PostObject("https://api.minecraftservices.com/minecraft/profile/lookup/bulk/byname", username, &response)
 	if err != nil {
 		return response, err
 	} else {

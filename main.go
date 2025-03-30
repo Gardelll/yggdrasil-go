@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2023. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2022-2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -31,10 +31,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 	"yggdrasil-go/model"
 	"yggdrasil-go/router"
+	"yggdrasil-go/service"
 	"yggdrasil-go/util"
 )
 
@@ -49,6 +51,18 @@ type MetaCfg struct {
 type ServerCfg struct {
 	ServerAddress  string   `ini:"server_address"`
 	TrustedProxies []string `ini:"trusted_proxies"`
+}
+
+type SmtpCfg struct {
+	SmtpServer            string `ini:"smtp_server"`
+	SmtpPort              int    `ini:"smtp_port"`
+	SmtpSsl               bool   `ini:"smtp_ssl"`
+	EmailFrom             string `ini:"email_from"`
+	SmtpUser              string `ini:"smtp_user"`
+	SmtpPassword          string `ini:"smtp_password"`
+	TitlePrefix           string `ini:"title_prefix"`
+	RegisterTemplate      string `ini:"register_template"`
+	ResetPasswordTemplate string `ini:"reset_password_template"`
 }
 
 func main() {
@@ -92,12 +106,25 @@ func main() {
 	if err != nil {
 		log.Fatal("无法读取配置文件", err)
 	}
+	smtpCfg := SmtpCfg{
+		SmtpServer:            "localhost",
+		SmtpPort:              25,
+		SmtpSsl:               false,
+		EmailFrom:             "Go Yggdrasil Server <mc@example.com>",
+		SmtpUser:              "mc@example.com",
+		SmtpPassword:          "123456",
+		TitlePrefix:           "[A Mojang Yggdrasil Server]",
+		RegisterTemplate:      "请访问下面的链接进行验证: <pre>" + meta.SkinRootUrl + "/profile/#emailVerifyToken={{.AccessToken}}</pre>",
+		ResetPasswordTemplate: "请访问下面的链接进行密码重置: <pre>" + meta.SkinRootUrl + "/profile/resetPassword#passwordResetToken={{.AccessToken}}</pre>",
+	}
+	err = cfg.Section("smtp").MapTo(&smtpCfg)
 	_, err = os.Stat(configFilePath)
 	if err != nil && os.IsNotExist(err) {
 		log.Println("配置文件不存在，已使用默认配置")
 		_ = cfg.Section("meta").ReflectFrom(&meta)
 		_ = cfg.Section("database").ReflectFrom(&dbCfg)
 		_ = cfg.Section("server").ReflectFrom(&serverCfg)
+		_ = cfg.Section("smtp").ReflectFrom(&smtpCfg)
 		err = cfg.SaveToIndent(configFilePath, " ")
 		if err != nil {
 			log.Println("警告: 无法保存配置文件", err)
@@ -133,8 +160,24 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	router.InitRouters(r, db, &serverMeta, meta.SkinRootUrl)
+	smtpConfig := service.SmtpConfig{
+		SmtpServer:            smtpCfg.SmtpServer,
+		SmtpPort:              smtpCfg.SmtpPort,
+		SmtpSsl:               smtpCfg.SmtpSsl,
+		EmailFrom:             smtpCfg.EmailFrom,
+		SmtpUser:              smtpCfg.SmtpUser,
+		SmtpPassword:          smtpCfg.SmtpPassword,
+		TitlePrefix:           smtpCfg.TitlePrefix,
+		RegisterTemplate:      smtpCfg.RegisterTemplate,
+		ResetPasswordTemplate: smtpCfg.ResetPasswordTemplate,
+	}
+	router.InitRouters(r, db, &serverMeta, &smtpConfig, meta.SkinRootUrl)
 	r.Static("/profile", "assets")
+	r.NoRoute(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/profile/") {
+			c.File("assets/index.html")
+		}
+	})
 	srv := &http.Server{
 		Addr:    serverCfg.ServerAddress,
 		Handler: r,

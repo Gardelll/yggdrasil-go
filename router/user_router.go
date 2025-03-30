@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2022-2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -35,9 +35,13 @@ type UserRouter interface {
 	Invalidate(c *gin.Context)
 	Signout(c *gin.Context)
 	UsernameToUUID(c *gin.Context)
+	UUIDToUUID(c *gin.Context)
 	QueryUUIDs(c *gin.Context)
 	QueryProfile(c *gin.Context)
 	ProfileKey(c *gin.Context)
+	SendEmail(c *gin.Context)
+	VerifyEmail(c *gin.Context)
+	ResetPassword(c *gin.Context)
 }
 
 type userRouterImpl struct {
@@ -109,6 +113,17 @@ type SignoutRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+type SendEmailRequest struct {
+	Email     string `json:"email" binding:"required,email"`
+	EmailType string `json:"emailType" binding:"required"`
+}
+
+type PasswordResetRequest struct {
+	Email       string `json:"email" binding:"required,email"`
+	Password    string `json:"password" binding:"required"`
+	AccessToken string `json:"accessToken" binding:"required"`
+}
+
 func (u *userRouterImpl) Register(c *gin.Context) {
 	request := RegRequest{}
 	err := c.ShouldBindJSON(&request)
@@ -116,7 +131,7 @@ func (u *userRouterImpl) Register(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusForbidden, util.NewForbiddenOperationError(err.Error()))
 		return
 	}
-	response, err := u.userService.Register(request.Username, request.Password, request.ProfileName)
+	response, err := u.userService.Register(request.Username, request.Password, request.ProfileName, c.ClientIP())
 	if err != nil {
 		util.HandleError(c, err)
 		return
@@ -228,6 +243,25 @@ func (u *userRouterImpl) UsernameToUUID(c *gin.Context) {
 	}
 }
 
+func (u *userRouterImpl) UUIDToUUID(c *gin.Context) {
+	profileIdStr := c.Param("uuid")
+	profileId, err := util.ToUUID(profileIdStr)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, util.NewIllegalArgumentError(err.Error()))
+		return
+	}
+	response, err := u.userService.UUIDToUUID(profileId)
+	if err != nil {
+		util.HandleError(c, err)
+		return
+	}
+	if response != nil {
+		c.JSON(http.StatusOK, response)
+	} else {
+		c.Status(http.StatusNoContent)
+	}
+}
+
 func (u *userRouterImpl) QueryUUIDs(c *gin.Context) {
 	var request []string
 	err := c.ShouldBindJSON(&request)
@@ -278,4 +312,55 @@ func (u *userRouterImpl) ProfileKey(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, response)
+}
+
+func (u *userRouterImpl) SendEmail(c *gin.Context) {
+	var request SendEmailRequest
+	err := c.ShouldBindJSON(&request)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusForbidden, util.NewForbiddenOperationError(err.Error()))
+		return
+	}
+	var tokenType service.RegTokenType
+	switch request.EmailType {
+	case "register":
+		tokenType = service.RegisterToken
+	case "resetPassword":
+		tokenType = service.ResetPasswordToken
+	}
+	err = u.userService.SendEmail(request.Email, tokenType, c.ClientIP())
+	if err != nil {
+		util.HandleError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (u *userRouterImpl) VerifyEmail(c *gin.Context) {
+	token, ok := c.GetQuery("access_token")
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusBadRequest, util.NewIllegalArgumentError("access_token is required"))
+		return
+	}
+	err := u.userService.VerifyEmail(token)
+	if err != nil {
+		util.HandleError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (u *userRouterImpl) ResetPassword(c *gin.Context) {
+	var request PasswordResetRequest
+	err := c.ShouldBindJSON(&request)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusForbidden, util.NewForbiddenOperationError(err.Error()))
+		return
+	}
+	err = u.userService.ResetPassword(request.Email, request.Password, request.AccessToken)
+	if err != nil {
+		util.HandleError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2023-2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,6 +18,7 @@
 import React from 'react';
 import './app.css';
 import Login from './login';
+import PasswordReset from './reset';
 import {Container} from '@mui/material';
 import {AppState} from './types';
 import User from './user';
@@ -29,12 +30,13 @@ function App() {
     const [appData, setAppData] = React.useState(() => {
         const saved = localStorage.getItem('appData');
         return (saved ? JSON.parse(saved) : {
-            login: false,
+            login: 'register',
             accessToken: '',
             tokenValid: false,
             loginTime: 0,
             profileName: '',
-            uuid: ''
+            uuid: '',
+            passwordReset: false
         }) as AppState;
     });
 
@@ -95,11 +97,52 @@ function App() {
         });
     }
 
-    return (
-        <Container maxWidth={'lg'}>
-            {appData.tokenValid ? <User appData={appData} setAppData={setAppData}/> : <Login appData={appData} setAppData={setAppData}/>}
-        </Container>
-    );
+    const path = window.location.pathname;
+    const hash = window.location.hash;
+    if (hash && hash.length > 1) {
+        const params = new URLSearchParams(hash.substring(1));
+        if (params.has('emailVerifyToken')) {
+            const token = params.get('emailVerifyToken');
+            axios.get('/authserver/verifyEmail?access_token=' + token)
+                .then(() => {
+                    window.location.replace('/profile/')
+                    enqueueSnackbar('邮箱验证通过', {variant: 'success'});
+                })
+                .catch(e => {
+                    const response = e.response;
+                    if (response && response.status >= 400 && response.status < 500) {
+                        let errorMessage = response.data.errorMessage ?? response.data;
+                        enqueueSnackbar('邮箱验证失败: ' + errorMessage, {variant: 'error'});
+                    } else {
+                        enqueueSnackbar('网络错误:' + e.message, {variant: 'error'});
+                    }
+                });
+        }
+    }
+    if (path === '/profile/resetPassword' || path === '/resetPassword') {
+        appData.passwordReset = true;
+        // setAppData(appData);
+    }
+
+    if (appData.tokenValid) {
+        return (
+            <Container maxWidth={'lg'}>
+                <User appData={appData} setAppData={setAppData}/>
+            </Container>
+        );
+    } else if (appData.passwordReset) {
+        return (
+            <Container maxWidth={'lg'}>
+                <PasswordReset appData={appData} setAppData={setAppData}/>
+            </Container>
+        )
+    } else {
+        return (
+            <Container maxWidth={'lg'}>
+                <Login appData={appData} setAppData={setAppData}/>
+            </Container>
+        );
+    }
 }
 
 export default App;

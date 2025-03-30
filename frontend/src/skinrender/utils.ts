@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2023-2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -99,7 +99,7 @@ function createCube(texture: THREE.Texture, width: number, height: number, depth
 }
 
 
-export default function createPlayerModel(skinTexture: THREE.Texture, capeTexture: THREE.Texture | null | undefined, v: number, slim: boolean = false, capeType?: string): THREE.Object3D<THREE.Event> {
+export default function createPlayerModel(skinTexture: THREE.Texture, capeTexture: THREE.Texture | null | undefined, v: number, slim: boolean = false, capeType?: string): THREE.Object3D<THREE.Object3DEventMap> {
     let headGroup = new THREE.Object3D();
     headGroup.name = 'headGroup';
     headGroup.position.x = 0;

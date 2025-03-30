@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2022-2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -30,6 +30,7 @@ type User struct {
 	UpdatedAt          time.Time
 	Email              string   `gorm:"size:64;uniqueIndex:email_idx"`
 	Password           string   `gorm:"size:255"`
+	EmailVerified      bool     `gorm:"default:false"`
 	ProfileName        string   `gorm:"size:64;uniqueIndex:profile_name_idx"`
 	ProfileModelType   string   `gorm:"size:8;default:STEVE"`
 	SerializedTextures string   `gorm:"type:TEXT NULL"`

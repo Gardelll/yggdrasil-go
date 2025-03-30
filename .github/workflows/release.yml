@@ -31,7 +31,7 @@ jobs:
         uses: crazy-max/ghaction-xgo@v2
         with:
           xgo_version: latest
-          go_version: 1.19
+          go_version: 1.24
           dest: build
           prefix: yggdrasil
           targets: windows/amd64,linux/amd64,linux/arm64,darwin/amd64,darwin/arm64
@@ -45,7 +45,7 @@ jobs:
       - name: Create ZIP archive
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          cp -v ./config_example.ini ./assets ./build/ || exit 1
+          cp -rv ./config_example.ini ./assets ./build/ || exit 1
           pushd build || exit 1
           ls -1 yggdrasil-* | while read LINE; do
           PREFIX="${LINE%.*}"

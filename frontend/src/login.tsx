@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2023-2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -48,9 +48,29 @@ function Login(props: { appData: AppState, setAppData: React.Dispatch<React.SetS
     const {enqueueSnackbar} = useSnackbar();
     const {register, handleSubmit, formState: {errors}} = useForm<Inputs>();
     const [submitting, setSubmitting] = React.useState(false);
+    const [submitText, setSubmitText] = React.useState('提交');
+    React.useEffect(() => {
+        if (submitting) {
+            return
+        }
+        switch (appData.login) {
+            case 'login':
+                setSubmitText('登录');
+                break;
+            case 'register':
+                setSubmitText('注册');
+                break;
+            case 'reset':
+                setSubmitText('重置');
+                break;
+            default:
+                setSubmitText('提交');
+                break;
+        }
+    }, [appData, submitting])
     const onSubmit: SubmitHandler<Inputs> = data => {
-        setSubmitting(true)
-        if (appData.login) {
+        setSubmitting(true);
+        if (appData.login === 'login') {
             axios.post('/authserver/authenticate', {
                 username: data.username,
                 password: data.password
@@ -80,7 +100,7 @@ function Login(props: { appData: AppState, setAppData: React.Dispatch<React.SetS
                     }
                 })
                 .finally(() => setSubmitting(false))
-        } else {
+        } else if (appData.login === 'register') {
             axios.post('/authserver/register', {
                 username: data.username,
                 password: data.password,
@@ -90,7 +110,7 @@ function Login(props: { appData: AppState, setAppData: React.Dispatch<React.SetS
                     let data = response.data
                     if (data && data.id) {
                         enqueueSnackbar("注册成功，uuid:" + data.id, {variant: 'success'});
-                        setLogin(true)
+                        setLogin('login')
                     } else {
                         enqueueSnackbar(data && data.errorMessage ? "注册失败: " + data.errorMessage: "注册失败", {variant: 'error'});
                     }
@@ -98,7 +118,7 @@ function Login(props: { appData: AppState, setAppData: React.Dispatch<React.SetS
                 .catch(e => {
                     const response = e.response;
                     if (response && response.data) {
-                        let errorMessage = response.data.errorMessage;
+                        let errorMessage = response.data.errorMessage ?? response.data;
                         let message =  "注册失败: " + errorMessage;
                         if (errorMessage === "profileName exist") {
                             message = "注册失败: 角色名已存在";
@@ -111,6 +131,38 @@ function Login(props: { appData: AppState, setAppData: React.Dispatch<React.SetS
                     }
                 })
                 .finally(() => setSubmitting(false))
+        } else if (appData.login === 'reset') {
+            const countdown = {
+                timeout: 60,
+            }
+            setSubmitText(`${countdown.timeout}`);
+            const timer = setInterval(() => {
+                countdown.timeout = countdown.timeout - 1;
+                if (countdown.timeout <= 0) {
+                    clearInterval(timer);
+                    setSubmitting(false);
+                    return
+                }
+                setSubmitting(true);
+                setSubmitText(`${countdown.timeout}`);
+            }, 1000);
+            axios.post('/authserver/sendEmail', {
+                email: data.username,
+                emailType: "resetPassword"
+            })
+                .then(() => {
+                    enqueueSnackbar("重置链接发送成功，请检查垃圾邮箱", {variant: 'success'});
+                })
+                .catch(e => {
+                    const response = e.response;
+                    if (response && response.data) {
+                        let errorMessage = response.data.errorMessage ?? response.data;
+                        enqueueSnackbar("发送失败: " + errorMessage, {variant: 'error'});
+                    } else {
+                        enqueueSnackbar('网络错误:' + e.message, {variant: 'error'});
+                    }
+                    countdown.timeout = 0;
+                });
         }
     };
 
@@ -122,7 +174,7 @@ function Login(props: { appData: AppState, setAppData: React.Dispatch<React.SetS
         event.preventDefault();
     };
 
-    const setLogin = (login: boolean) => setAppData((oldData: AppState) => {
+    const setLogin = (login: string) => setAppData((oldData: AppState) => {
         return {
             ...oldData,
             login
@@ -146,19 +198,21 @@ function Login(props: { appData: AppState, setAppData: React.Dispatch<React.SetS
                             required
                             error={errors.username && true}
                             type='email'
-                            inputProps={{
-                                ...register('username', {required: true})
+                            slotProps={{
+                                htmlInput: {
+                                    ...register('username', {required: true})
+                                }
                             }}
                         />
                     </div>
-                    <Collapse in={!appData.login} className='profileName'>
-                        <FormControl fullWidth variant="filled" required={!appData.login} error={errors.profileName && true}>
+                    <Collapse in={appData.login === 'register'} className='profileName'>
+                        <FormControl fullWidth variant="filled" required={appData.login === 'register'} error={errors.profileName && true}>
                             <InputLabel htmlFor="profileName-input">角色名</InputLabel>
                             <FilledInput
                                 id="profileName-input"
                                 name="profileName"
-                                required={!appData.login}
-                                inputProps={appData.login ? {} : {
+                                required={appData.login === 'register'}
+                                inputProps={appData.login !== 'register' ? {} : {
                                     minLength: '2', maxLength: 16,
                                     ...register('profileName', {required: true, minLength: 2, pattern: /^[a-zA-Z0-9_]{1,16}$/, maxLength: 16})
                                 }}
@@ -166,13 +220,13 @@ function Login(props: { appData: AppState, setAppData: React.Dispatch<React.SetS
                             <FocusedShowHelperText id="profileName-input-helper-text">字母，数字或下划线</FocusedShowHelperText>
                         </FormControl>
                     </Collapse>
-                    <div className='password'>
-                        <FormControl fullWidth variant="filled" required error={errors.password && true}>
+                    <Collapse in={appData.login !== 'reset'} className='password'>
+                        <FormControl fullWidth variant="filled" required={appData.login !== 'reset'} error={errors.password && true}>
                             <InputLabel htmlFor="password-input">密码</InputLabel>
                             <FilledInput
                                 id="password-input"
                                 name="password"
-                                required
+                                required={appData.login !== 'reset'}
                                 type={showPassword ? 'text' : 'password'}
                                 endAdornment={
                                     <InputAdornment position="end">
@@ -185,17 +239,19 @@ function Login(props: { appData: AppState, setAppData: React.Dispatch<React.SetS
                                         </IconButton>
                                     </InputAdornment>
                                 }
-                                inputProps={{
+                                inputProps={appData.login === 'reset' ? {} : {
                                     minLength: '6',
                                     ...register('password', {required: true, minLength: 6})
                                 }}
                             />
-                            <FocusedShowHelperText id="password-input-helper-text">警告: 暂无重置密码接口，请妥善保管密码</FocusedShowHelperText>
+                            <FocusedShowHelperText id="password-input-helper-text">请妥善保管密码</FocusedShowHelperText>
                         </FormControl>
-                    </div>
+                    </Collapse>
                     <div className='button-container'>
-                        <Button variant='contained' onClick={() => setLogin(!appData.login)} disabled={submitting}>{appData.login ? '注册' : '已有帐号登录'}</Button>
-                        <Button variant='contained' type='submit' disabled={submitting}>{appData.login ? '登录' : '注册'}</Button>
+                        {appData.login !== 'reset' && <Button variant='contained' onClick={() => setLogin('reset')}>忘记密码</Button>}
+                        {appData.login !== 'login' && <Button variant='contained' onClick={() => setLogin('login')}>已有账号登录</Button>}
+                        {appData.login !== 'register' && <Button variant='contained' onClick={() => setLogin('register')}>注册</Button>}
+                        <Button variant='contained' type='submit' disabled={submitting}>{submitText}</Button>
                     </div>
                 </Box>
             </Paper>

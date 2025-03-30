@@ -15,12 +15,29 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-export type AppState = {
-    login: string
-    accessToken: string
-    tokenValid: boolean
-    loginTime: number
-    profileName: string
-    uuid: string
-    passwordReset: boolean
+.header {
+    text-align: center;
+}
+
+.reset-card {
+    padding: 14px 24px;
+    margin: auto;
+}
+
+.username,
+.password {
+    display: block;
+    width: 87%;
+    margin: 20px auto;
+}
+
+.button-container {
+    display: flex;
+    justify-content: flex-end;
+    width: 87%;
+    margin: auto;
+}
+
+.button-container button {
+    margin: 3px;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2023-2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -21,7 +21,7 @@ import {Canvas, RootState, useFrame, useLoader} from '@react-three/fiber';
 import React from 'react';
 import createPlayerModel from './utils';
 import {OrbitControls} from '@react-three/drei';
-import {EffectComposer, Vignette, SMAA, SSAO, SSR} from '@react-three/postprocessing';
+import {EffectComposer, SSAO} from '@react-three/postprocessing';
 import {BlendFunction} from 'postprocessing';
 
 function PlayerModel(props: { skinUrl: string, capeUrl?: string, slim?: boolean }) {
@@ -84,7 +84,7 @@ function SkinRender(props: { skinUrl: string, capeUrl?: string, slim?: boolean }
                         rangeFalloff={0.1}
                         luminanceInfluence={0.9}
                         radius={20}
-                        scale={0.5}
+                        resolutionScale={0.5}
                         bias={0.5}
                     />
                 </EffectComposer>
