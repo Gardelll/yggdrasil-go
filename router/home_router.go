@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2023. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2022-2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -33,10 +33,11 @@ type MetaInfo struct {
 		Homepage string `json:"homepage,omitempty"`
 		Register string `json:"register,omitempty"`
 	} `json:"links"`
-	FeatureNonEmailLogin     bool `json:"feature.non_email_login,omitempty"`
-	FeatureLegacySkinApi     bool `json:"feature.legacy_skin_api,omitempty"`
-	FeatureNoMojangNamespace bool `json:"feature.no_mojang_namespace,omitempty"`
-	FeatureEnableProfileKey  bool `json:"feature.enable_profile_key,omitempty"`
+	FeatureNonEmailLogin            bool `json:"feature.non_email_login,omitempty"`
+	FeatureLegacySkinApi            bool `json:"feature.legacy_skin_api,omitempty"`
+	FeatureNoMojangNamespace        bool `json:"feature.no_mojang_namespace,omitempty"`
+	FeatureEnableProfileKey         bool `json:"feature.enable_profile_key,omitempty"`
+	FeatureEnableMojangAntiFeatures bool `json:"feature.enable_mojang_anti_features,omitempty"`
 }
 
 type ServerMeta struct {

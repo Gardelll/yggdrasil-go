@@ -151,6 +151,7 @@ func main() {
 	serverMeta.Meta.ImplementationVersion = meta.ImplementationVersion
 	serverMeta.Meta.FeatureNoMojangNamespace = true
 	serverMeta.Meta.FeatureEnableProfileKey = true
+	serverMeta.Meta.FeatureEnableMojangAntiFeatures = true
 	serverMeta.Meta.Links.Homepage = meta.SkinRootUrl + "/profile/"
 	serverMeta.Meta.Links.Register = meta.SkinRootUrl + "/profile/"
 	serverMeta.SkinDomains = meta.SkinDomains

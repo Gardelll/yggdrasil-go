@@ -38,6 +38,7 @@ type UserRouter interface {
 	UUIDToUUID(c *gin.Context)
 	QueryUUIDs(c *gin.Context)
 	QueryProfile(c *gin.Context)
+	PlayerAttributes(c *gin.Context)
 	ProfileKey(c *gin.Context)
 	SendEmail(c *gin.Context)
 	VerifyEmail(c *gin.Context)
@@ -297,6 +298,21 @@ func (u *userRouterImpl) QueryProfile(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, response)
+}
+
+func (u *userRouterImpl) PlayerAttributes(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"privileges": gin.H{
+			"onlineChat":        true,
+			"multiplayerServer": true,
+			"multiplayerRealms": false,
+			"telemetry":         false,
+			"optionalTelemetry": false,
+		},
+		"profanityFilterPreferences": gin.H{
+			"profanityFilterOn": false,
+		},
+	})
 }
 
 func (u *userRouterImpl) ProfileKey(c *gin.Context) {
