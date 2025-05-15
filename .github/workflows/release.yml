@@ -52,7 +52,7 @@ jobs:
           SUFFIX="$(echo "$LINE" | grep -osE '\.\w+' || printf '')"
           cp -v "$LINE" "yggdrasil$SUFFIX"
           FILE="../$PREFIX.zip"
-          zip -9v "$FILE" "yggdrasil$SUFFIX" *.ini assets
+          zip -9rv "$FILE" "yggdrasil$SUFFIX" *.ini assets
           DGST="$FILE.dgst"
           openssl dgst -md5    "$FILE" | sed 's/([^)]*)//g' >>"$DGST"
           openssl dgst -sha1   "$FILE" | sed 's/([^)]*)//g' >>"$DGST"
