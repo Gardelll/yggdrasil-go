@@ -3,6 +3,8 @@ FROM debian:12-slim
 LABEL maintainer="Gardel <sunxinao@hotmail.com>"
 LABEL "Description"="Go Yggdrasil Server"
 
+RUN apt-get update && apt-get install -y ca-certificates
+RUN update-ca-certificates
 ARG TARGETOS
 ARG TARGETARCH
 RUN mkdir -p /app
