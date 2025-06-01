@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM debian:12-slim
 
 LABEL maintainer="Gardel <sunxinao@hotmail.com>"
 LABEL "Description"="Go Yggdrasil Server"
