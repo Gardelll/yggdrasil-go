@@ -398,7 +398,7 @@ func (u *userServiceImpl) ProfileKey(accessToken string) (resp *ProfileKeyRespon
 		resp = new(ProfileKeyResponse)
 		now := time.Now().UTC()
 		resp.RefreshedAfter = now
-		resp.ExpiresAt = now.Add(time.Hour * 24 * 90)
+		resp.ExpiresAt = now.Add(10 * time.Minute)
 		keyPair, err := u.getProfileKey(token.SelectedProfile.Id)
 		if err != nil {
 			return nil, err
