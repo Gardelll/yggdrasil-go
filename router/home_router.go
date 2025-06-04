@@ -62,8 +62,9 @@ type HomeRouter interface {
 }
 
 type homeRouterImpl struct {
-	serverMeta ServerMeta
-	myPubKey   KeyPair
+	serverMeta   ServerMeta
+	myPubKey     KeyPair
+	cachedPubKey *PublicKeys
 }
 
 func NewHomeRouter(meta *ServerMeta) HomeRouter {
@@ -81,6 +82,10 @@ func (h *homeRouterImpl) Home(c *gin.Context) {
 }
 
 func (h *homeRouterImpl) PublicKeys(c *gin.Context) {
+	if h.cachedPubKey != nil {
+		c.JSON(http.StatusOK, h.cachedPubKey)
+		return
+	}
 	publicKeys := PublicKeys{}
 	err := util.GetObject("https://api.minecraftservices.com/publickeys", &publicKeys)
 	if err != nil {
@@ -90,4 +95,5 @@ func (h *homeRouterImpl) PublicKeys(c *gin.Context) {
 	publicKeys.ProfilePropertyKeys = append(publicKeys.ProfilePropertyKeys, h.myPubKey)
 	publicKeys.PlayerCertificateKeys = append(publicKeys.PlayerCertificateKeys, h.myPubKey)
 	c.JSON(http.StatusOK, publicKeys)
+	h.cachedPubKey = &publicKeys
 }
