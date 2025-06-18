@@ -394,29 +394,35 @@ func (u *userServiceImpl) QueryProfile(profileId uuid.UUID, unsigned bool, textu
 
 func (u *userServiceImpl) ProfileKey(accessToken string) (resp *ProfileKeyResponse, err error) {
 	token, ok := u.tokenService.GetToken(accessToken)
+	var profileId uuid.UUID
 	if ok && token.GetAvailableLevel() == model.Valid {
-		resp = new(ProfileKeyResponse)
-		now := time.Now().UTC()
-		resp.RefreshedAfter = now
-		resp.ExpiresAt = now.Add(10 * time.Minute)
-		keyPair, err := u.getProfileKey(token.SelectedProfile.Id)
-		if err != nil {
-			return nil, err
-		}
-		resp.KeyPair = keyPair
-		signStr := fmt.Sprintf("%d%s", resp.ExpiresAt.UnixMilli(), keyPair.PublicKey)
-		sign, err := util.Sign(signStr)
-		if err != nil {
-			return nil, err
-		}
-		resp.PublicKeySignature = sign
-		resp.PublicKeySignatureV2 = sign
+		profileId = token.SelectedProfile.Id
 	} else {
-		err = util.PostForString("https://api.minecraftservices.com/player/certificates", accessToken, []byte(""), resp)
+		id, _, err := util.ParseOfficialToken(accessToken)
+		if err != nil {
+			return nil, err
+		}
+		profileId, err = util.ToUUID(id)
 		if err != nil {
 			return nil, err
 		}
 	}
+	resp = new(ProfileKeyResponse)
+	now := time.Now().UTC()
+	resp.RefreshedAfter = now
+	resp.ExpiresAt = now.Add(10 * time.Minute)
+	keyPair, err := u.getProfileKey(profileId)
+	if err != nil {
+		return nil, err
+	}
+	resp.KeyPair = keyPair
+	signStr := fmt.Sprintf("%d%s", resp.ExpiresAt.UnixMilli(), keyPair.PublicKey)
+	sign, err := util.Sign(signStr)
+	if err != nil {
+		return nil, err
+	}
+	resp.PublicKeySignature = sign
+	resp.PublicKeySignatureV2 = sign
 	return resp, nil
 }
 
