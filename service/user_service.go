@@ -118,7 +118,7 @@ func (u *userServiceImpl) Register(username, password, profileName, ip string) (
 	} else if _, err := mojangUsernameToUUID(profileName); err == nil {
 		return nil, util.NewForbiddenOperationError("profileName duplicate")
 	}
-	matched, err := regexp.MatchString("^(\\w){3,}(\\.\\w+)*@(\\w){2,}((\\.\\w+)+)$", username)
+	matched, err := regexp.MatchString("^\\w+@(\\w){2,}((\\.\\w+)+)$", username)
 	if err != nil {
 		return nil, err
 	}
