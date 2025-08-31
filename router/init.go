@@ -80,6 +80,7 @@ func InitRouters(router *gin.Engine, db *gorm.DB, meta *ServerMeta, smtpCfg *ser
 	minecraftservices := router.Group("/minecraftservices")
 	{
 		minecraftservices.GET("/player/attributes", userRouter.PlayerAttributes)
+		minecraftservices.GET("/privacy/blocklist", userRouter.PlayerBlockList)
 		minecraftservices.POST("/player/certificates", userRouter.ProfileKey)
 		minecraftservices.GET("/publickeys", homeRouter.PublicKeys)
 		minecraftservices.GET("/minecraft/profile/lookup/:uuid", userRouter.UUIDToUUID)

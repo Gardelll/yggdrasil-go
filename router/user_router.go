@@ -39,6 +39,7 @@ type UserRouter interface {
 	QueryUUIDs(c *gin.Context)
 	QueryProfile(c *gin.Context)
 	PlayerAttributes(c *gin.Context)
+	PlayerBlockList(c *gin.Context)
 	ProfileKey(c *gin.Context)
 	SendEmail(c *gin.Context)
 	VerifyEmail(c *gin.Context)
@@ -312,6 +313,12 @@ func (u *userRouterImpl) PlayerAttributes(c *gin.Context) {
 		"profanityFilterPreferences": gin.H{
 			"profanityFilterOn": false,
 		},
+	})
+}
+
+func (u *userRouterImpl) PlayerBlockList(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"blockedProfiles": []string{},
 	})
 }
 
