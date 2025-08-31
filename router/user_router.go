@@ -304,11 +304,21 @@ func (u *userRouterImpl) QueryProfile(c *gin.Context) {
 func (u *userRouterImpl) PlayerAttributes(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"privileges": gin.H{
-			"onlineChat":        true,
-			"multiplayerServer": true,
-			"multiplayerRealms": false,
-			"telemetry":         false,
-			"optionalTelemetry": false,
+			"onlineChat": gin.H{
+				"enabled": true,
+			},
+			"multiplayerServer": gin.H{
+				"enabled": true,
+			},
+			"multiplayerRealms": gin.H{
+				"enabled": false,
+			},
+			"telemetry": gin.H{
+				"enabled": false,
+			},
+			"optionalTelemetry": gin.H{
+				"enabled": false,
+			},
 		},
 		"profanityFilterPreferences": gin.H{
 			"profanityFilterOn": false,
