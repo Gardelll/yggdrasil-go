@@ -11,7 +11,7 @@ PACKAGE_NAME = yggdrasil.tar.gz
 default: $(BINARY)
 
 $(BINARY):assets
-	$(GO_BUILD) -tags='nomsgpack,sqlite,mysql' -o $(BINARY)
+	$(GO_BUILD) -tags='nomsgpack,sqlite,mysql,postgres' -o $(BINARY)
 
 get:
 	$(GO_GET)

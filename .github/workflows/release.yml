@@ -39,7 +39,7 @@ jobs:
           x: false
           race: false
           ldflags: -s -w -buildid=
-          tags: nomsgpack sqlite mysql
+          tags: nomsgpack sqlite mysql postgres
           trimpath: true
 
       - name: Create ZIP archive
