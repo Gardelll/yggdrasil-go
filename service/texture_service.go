@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2022-2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -213,6 +213,7 @@ func (t *textureServiceImpl) saveTexture(user *model.User, skinImage image.Image
 		oldHash, oldExist := profile.Textures[textureType]
 		texture := model.Texture{}
 		if err := tx.First(&texture, "hash = ?", hash).Error; err != nil {
+			// Texture does not exist, create new texture with used = 1
 			texture.Hash = hash
 			texture.Used = 1
 			buffer := bytes.Buffer{}
@@ -225,7 +226,12 @@ func (t *textureServiceImpl) saveTexture(user *model.User, skinImage image.Image
 				return err
 			}
 		} else {
-			if oldExist && oldHash != hash {
+			// Texture already exists
+			// Increment reference count if:
+			// - First time setting texture (!oldExist), OR
+			// - Replacing with different texture (oldHash != hash)
+			// Do NOT increment if re-uploading same texture (oldHash == hash)
+			if !oldExist || oldHash != hash {
 				tx.Model(&texture).Update("used", gorm.Expr("used + ?", 1))
 			}
 		}
