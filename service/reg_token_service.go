@@ -30,6 +30,7 @@ import (
 type RegTokenService interface {
 	SendTokenEmail(tokenType RegTokenType, email string) error
 	VerifyToken(accessToken string) (string, error)
+	IsSmtpEnabled() bool
 }
 
 type RegTokenType uint
@@ -40,6 +41,7 @@ const (
 )
 
 type SmtpConfig struct {
+	Enabled               bool
 	SmtpServer            string
 	SmtpPort              int
 	SmtpSsl               bool
@@ -53,6 +55,7 @@ type SmtpConfig struct {
 
 type regTokenServiceImpl struct {
 	tokenCache            *lru.Cache
+	smtpEnabled           bool
 	smtpServer            string
 	smtpPort              int
 	smtpSsl               bool
@@ -68,6 +71,7 @@ func NewRegTokenService(smtpCfg *SmtpConfig) RegTokenService {
 	cache, _ := lru.New(10000000)
 	impl := &regTokenServiceImpl{
 		tokenCache:            cache,
+		smtpEnabled:           smtpCfg.Enabled,
 		smtpServer:            smtpCfg.SmtpServer,
 		smtpPort:              smtpCfg.SmtpPort,
 		smtpSsl:               smtpCfg.SmtpSsl,
@@ -82,6 +86,11 @@ func NewRegTokenService(smtpCfg *SmtpConfig) RegTokenService {
 }
 
 func (r *regTokenServiceImpl) SendTokenEmail(tokenType RegTokenType, email string) error {
+	// If SMTP is not enabled, return immediately without sending email
+	if !r.smtpEnabled {
+		return nil
+	}
+
 	token := model.NewRegToken(email)
 	r.tokenCache.Add(token.AccessToken, token)
 
@@ -141,4 +150,8 @@ func (r *regTokenServiceImpl) VerifyToken(accessToken string) (string, error) {
 	}
 
 	return "", util.NewIllegalArgumentError("wrong access token or email")
+}
+
+func (r *regTokenServiceImpl) IsSmtpEnabled() bool {
+	return r.smtpEnabled
 }

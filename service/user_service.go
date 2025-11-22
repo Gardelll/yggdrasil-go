@@ -137,10 +137,22 @@ func (u *userServiceImpl) Register(username, password, profileName, ip string) (
 	profile := model.NewProfile(user.ID, profileName, model.STEVE, "")
 	user.SetProfile(&profile)
 
+	// Set email verification status based on SMTP configuration
+	if u.regTokenService.IsSmtpEnabled() {
+		user.EmailVerified = false
+	} else {
+		user.EmailVerified = true
+	}
+
 	if err := u.db.Create(&user).Error; err != nil {
 		return nil, err
 	}
-	_ = u.SendEmail(user.Email, RegisterToken, ip)
+
+	// Only send verification email if SMTP is enabled
+	if u.regTokenService.IsSmtpEnabled() {
+		_ = u.SendEmail(user.Email, RegisterToken, ip)
+	}
+
 	response := user.ToResponse()
 	return &response, nil
 }
@@ -461,6 +473,11 @@ func (u *userServiceImpl) VerifyEmail(accessToken string) error {
 }
 
 func (u *userServiceImpl) ResetPassword(email string, password string, accessToken string) error {
+	// Check if SMTP is enabled, if not return error
+	if !u.regTokenService.IsSmtpEnabled() {
+		return util.NewForbiddenOperationError("密码重置功能当前不可用，请联系管理员")
+	}
+
 	user := model.User{}
 	err := u.db.Where("email = ?", email).First(&user).Error
 	if err != nil {

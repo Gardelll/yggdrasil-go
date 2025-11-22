@@ -65,6 +65,11 @@ type SmtpCfg struct {
 	ResetPasswordTemplate string `ini:"reset_password_template"`
 }
 
+// IsSmtpConfigValid checks if SMTP configuration is valid based on required fields
+func IsSmtpConfigValid(cfg *SmtpCfg) bool {
+	return cfg.SmtpServer != "" && cfg.SmtpPort > 0
+}
+
 func main() {
 	configFilePath := "config.ini"
 	cfg, err := ini.LooseLoad(configFilePath)
@@ -107,8 +112,8 @@ func main() {
 		log.Fatal("无法读取配置文件", err)
 	}
 	smtpCfg := SmtpCfg{
-		SmtpServer:            "localhost",
-		SmtpPort:              25,
+		SmtpServer:            "",
+		SmtpPort:              0,
 		SmtpSsl:               false,
 		EmailFrom:             "Go Yggdrasil Server <mc@example.com>",
 		SmtpUser:              "mc@example.com",
@@ -129,6 +134,13 @@ func main() {
 		if err != nil {
 			log.Println("警告: 无法保存配置文件", err)
 		}
+	}
+	// Check SMTP configuration validity and log status
+	smtpEnabled := IsSmtpConfigValid(&smtpCfg)
+	if smtpEnabled {
+		log.Println("SMTP 配置正确, 邮箱验证已启用")
+	} else {
+		log.Println("SMTP 配置缺失, 已禁用邮箱验证")
 	}
 	checkRsaKeyFile(privateKeyPath, publicKeyPath)
 	publicKeyContent, err := os.ReadFile(publicKeyPath)
@@ -162,6 +174,7 @@ func main() {
 		log.Fatal(err)
 	}
 	smtpConfig := service.SmtpConfig{
+		Enabled:               smtpEnabled,
 		SmtpServer:            smtpCfg.SmtpServer,
 		SmtpPort:              smtpCfg.SmtpPort,
 		SmtpSsl:               smtpCfg.SmtpSsl,

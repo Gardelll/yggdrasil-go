@@ -19,7 +19,9 @@
 ## 准备
 
 + 运行 Linux, Windows 或 MacOS 的主机
-+ SMTP 服务器和账号用于发送密码找回邮件（可选）
++ SMTP 服务器和账号用于发送邮箱验证和密码重置邮件（**完全可选**）
+  - 无SMTP配置时：用户注册后自动验证，密码重置功能禁用
+  - 有SMTP配置时：保持原有邮箱验证流程
 + MySQL 或 PostgreSQL 数据库（如果使用 SQLite 则不需要）
 
 ## 用法
@@ -44,6 +46,6 @@ docker run -d --name yggdrasil-go -v $(pwd)/data:/app/data -p 8080:8080 gardel/y
 
 - [x] 支持密码重置
 - [x] 支持不同的数据库如 PostgreSQL 等
+- [x] SMTP配置可选化（无SMTP时自动禁用邮箱验证）
 - [ ] 添加选项以支持完全离线模式（不检查 Mojang 接口）
-- [ ] 添加选项以禁用邮箱验证
 - [ ] 令牌持久化防止升级和重启时令牌生效

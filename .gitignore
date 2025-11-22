@@ -24,3 +24,15 @@ yggdrasil
 /*.pem
 /*.db
 /config.ini
+
+# Logs and environment files
+*.log
+*.log.*
+.env
+.env.*
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
