@@ -70,7 +70,7 @@ function SkinRender(props: { skinUrl: string, capeUrl?: string, slim?: boolean }
                 camera={{position: [0, 15, 35], near: 5}}
                 gl={{antialias: true, alpha: true, preserveDrawingBuffer: true}}
                 onCreated={onCanvasCreate}>
-                <ambientLight color={0xa0a0a0}/>
+                <ambientLight color={0xffffff}/>
                 <PlayerModel {...props}/>
                 <OrbitControls makeDefault/>
                 <EffectComposer>
