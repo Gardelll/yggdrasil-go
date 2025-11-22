@@ -23,7 +23,7 @@ assets:
 	cp -r frontend/dist/. assets/
 
 package:$(BINARY)
-	tar -zcf $(PACKAGE_NAME) $(BINARY) config_example.ini assets
+	tar -zcf $(PACKAGE_NAME) $(BINARY) config_example.ini assets templates
 
 clean:
 	-$(GO_CLEAN)

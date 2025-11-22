@@ -13,6 +13,7 @@ COPY "build/yggdrasil-${TARGETOS}-${TARGETARCH}" /app/yggdrasil
 EXPOSE 8080
 VOLUME /app/data
 COPY assets /app/data/assets/
+COPY templates /app/data/templates/
 
 WORKDIR /app/data
 ENTRYPOINT ["/app/yggdrasil"]

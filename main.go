@@ -54,15 +54,17 @@ type ServerCfg struct {
 }
 
 type SmtpCfg struct {
-	SmtpServer            string `ini:"smtp_server"`
-	SmtpPort              int    `ini:"smtp_port"`
-	SmtpSsl               bool   `ini:"smtp_ssl"`
-	EmailFrom             string `ini:"email_from"`
-	SmtpUser              string `ini:"smtp_user"`
-	SmtpPassword          string `ini:"smtp_password"`
-	TitlePrefix           string `ini:"title_prefix"`
-	RegisterTemplate      string `ini:"register_template"`
-	ResetPasswordTemplate string `ini:"reset_password_template"`
+	SmtpServer                string `ini:"smtp_server"`
+	SmtpPort                  int    `ini:"smtp_port"`
+	SmtpSsl                   bool   `ini:"smtp_ssl"`
+	EmailFrom                 string `ini:"email_from"`
+	SmtpUser                  string `ini:"smtp_user"`
+	SmtpPassword              string `ini:"smtp_password"`
+	TitlePrefix               string `ini:"title_prefix"`
+	RegisterTemplateFile      string `ini:"register_template_file"`
+	RegisterTemplate          string `ini:"register_template"`
+	ResetPasswordTemplateFile string `ini:"reset_password_template_file"`
+	ResetPasswordTemplate     string `ini:"reset_password_template"`
 }
 
 // IsSmtpConfigValid checks if SMTP configuration is valid based on required fields
@@ -116,8 +118,6 @@ func main() {
 		SmtpPort:              0,
 		SmtpSsl:               false,
 		EmailFrom:             "Go Yggdrasil Server <mc@example.com>",
-		SmtpUser:              "mc@example.com",
-		SmtpPassword:          "123456",
 		TitlePrefix:           "[A Mojang Yggdrasil Server]",
 		RegisterTemplate:      "请访问下面的链接进行验证: <pre>" + meta.SkinRootUrl + "/profile/#emailVerifyToken={{.AccessToken}}</pre>",
 		ResetPasswordTemplate: "请访问下面的链接进行密码重置: <pre>" + meta.SkinRootUrl + "/profile/resetPassword#passwordResetToken={{.AccessToken}}</pre>",
@@ -173,6 +173,21 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// 优先使用文件模板，如果文件路径配置了的话
+	registerTemplate := smtpCfg.RegisterTemplate
+	if smtpCfg.RegisterTemplateFile != "" {
+		if content, err := os.ReadFile(smtpCfg.RegisterTemplateFile); err == nil {
+			registerTemplate = string(content)
+		}
+	}
+
+	resetPasswordTemplate := smtpCfg.ResetPasswordTemplate
+	if smtpCfg.ResetPasswordTemplateFile != "" {
+		if content, err := os.ReadFile(smtpCfg.ResetPasswordTemplateFile); err == nil {
+			resetPasswordTemplate = string(content)
+		}
+	}
+
 	smtpConfig := service.SmtpConfig{
 		Enabled:               smtpEnabled,
 		SmtpServer:            smtpCfg.SmtpServer,
@@ -182,8 +197,8 @@ func main() {
 		SmtpUser:              smtpCfg.SmtpUser,
 		SmtpPassword:          smtpCfg.SmtpPassword,
 		TitlePrefix:           smtpCfg.TitlePrefix,
-		RegisterTemplate:      smtpCfg.RegisterTemplate,
-		ResetPasswordTemplate: smtpCfg.ResetPasswordTemplate,
+		RegisterTemplate:      registerTemplate,
+		ResetPasswordTemplate: resetPasswordTemplate,
 	}
 	router.InitRouters(r, db, &serverMeta, &smtpConfig, meta.SkinRootUrl)
 	r.Static("/profile", "assets")
