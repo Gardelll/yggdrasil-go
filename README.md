@@ -40,6 +40,65 @@
 docker run -d --name yggdrasil-go -v $(pwd)/data:/app/data -p 8080:8080 gardel/yggdrasil-go:latest
 ```
 
+## 开服指南
+
+使用本认证服务器开服非常简单，只需以下几个步骤：
+
+### 1. 启动认证服务器
+确保认证服务器已在运行，记录下服务器的 URL（例如：`http://localhost:8080`）。
+
+### 2. 下载 authlib-injector
+从 [authlib-injector 官网](https://authlib-injector.yushi.moe/) 下载最新版本的 `authlib-injector.jar`。
+
+### 3. 配置 Minecraft 服务端
+#### 基本配置
+1. 在服务端 `server.properties` 中设置：
+   ```
+   online-mode=true
+   ```
+2. 对于 Minecraft 1.19+ 版本，由于本认证服务器兼容正版验证，使用官方启动器的玩家无法新人本认证服务器的签名密钥，需要设置：
+   ```
+   enforce-secure-profile=false
+   ```
+
+#### 启动参数配置
+在启动 Minecraft 服务端时添加以下 JVM 参数（参数位于 `-jar` 之前）：
+
+```bash
+-javaagent:{path/to/authlib-injector.jar}={your-yggdrasil-server-url} -Dauthlibinjector.disableHttpd
+```
+
+请使用 authlibinjector.disableHttpd 参数关闭 authlib-injector 内置的 http 端点，以确保 Minecraft 服务器能直接访问本认证服务器的拓展接口。
+
+例如，如果你将 `authlib-injector.jar` 放在服务端同一目录下，认证服务器运行在 `http://localhost:8080`，则启动命令为：
+
+```bash
+java -javaagent:authlib-injector.jar=http://localhost:8080 -Dauthlibinjector.disableHttpd -jar minecraft_server.1.12.2.jar nogui
+```
+
+### 4. 玩家登录
+玩家需要在支持外置登录的第三方启动器中配置此认证服务器：
+1. 选择外置登录模式
+2. 填入认证服务器 URL（例如：`http://localhost:8080`）
+3. 使用在认证服务器上注册的账号登录
+
+### 5. 使用正版账号登录（不使用authlib-injector）
+不使用 authlib-injector 将无法加载外置登录玩家的皮肤，
+可以配合此 [修复模组](https://git.gardel.top/magic-server/yggdrasil-skinfix) 使用
+
+### 6. BungeeCord/Velocity 配置（可选）
+如果使用 BungeeCord 或 Velocity 代理：
+1. 在所有后端服务端和代理服务器上都加载 authlib-injector
+2. 只在 BungeeCord/Velocity 上开启 `online-mode=true`
+3. 后端服务端设置 `online-mode=false`
+4. 在 BungeeCord/Velocity 上开启 `enforce-secure-chat=false`
+
+### 注意事项
+- 确保认证服务器可通过公共网络访问
+- Minecraft 1.19+ 版本必须正确设置 `enforce-secure-profile`
+- 本认证服务器兼容正版登录，因此注册时使用的角色名不可与官方服务器重复
+- 如果客户端也关闭内置 http 端点，`@mojang` 后缀获取官方皮肤的功能将会失效
+
 ## 实现差异
 
 本实现在完全兼容 [Yggdrasil 服务端技术规范](https://github.com/yushijinhun/authlib-injector/wiki/Yggdrasil-%E6%9C%8D%E5%8A%A1%E7%AB%AF%E6%8A%80%E6%9C%AF%E8%A7%84%E8%8C%83) 的基础上，还提供了额外的扩展功能：
