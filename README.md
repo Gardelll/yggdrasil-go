@@ -12,9 +12,7 @@
 
 用于服务器管理员调试和测试时使用小号登录而不必关闭在线验证 (online-mode)。
 
-禁止使玩家绕过在线验证登录服务器而不必购买 Minecraft。
-
-禁止其他违反 [EULA](https://account.mojang.com/documents/minecraft_eula) 的行为。
+禁止其他违反 [EULA](https://www.minecraft.net/eula) 的行为。
 
 ## 准备
 
@@ -41,6 +39,42 @@
 ```shell
 docker run -d --name yggdrasil-go -v $(pwd)/data:/app/data -p 8080:8080 gardel/yggdrasil-go:latest
 ```
+
+## 实现差异
+
+本实现在完全兼容 [Yggdrasil 服务端技术规范](https://github.com/yushijinhun/authlib-injector/wiki/Yggdrasil-%E6%9C%8D%E5%8A%A1%E7%AB%AF%E6%8A%80%E6%9C%AF%E8%A7%84%E8%8C%83) 的基础上，还提供了额外的扩展功能：
+
+### 核心规范兼容性
+**100% 实现** - 所有12个核心API端点均已完全实现，无缺失或重大差异
+
+### 扩展功能（16个额外端点）
+1. **用户管理扩展**（5个）: 注册、邮箱验证、密码重置、角色切换
+2. **材质管理扩展**（3个）: 材质文件下载、URL设置、重复路径
+3. **Minecraft 1.19+兼容**（4个）: 玩家属性、隐私设置、消息签名
+4. **Mojang API兼容**（4个）: profile lookup系列端点
+
+### 实现细节差异
+1. **离线登录兼容性**（中影响）：未采用与Mojang离线验证兼容的UUID生成方式，可能影响从离线验证系统迁移的用户数据兼容性
+2. **材质ID生成算法**（低影响）：使用了与Mojang不同的材质hash计算方法
+
+## 贡献指南
+
+我们欢迎任何形式的贡献！在提交贡献之前，请注意：
+
+### 开发环境准备
+1. 安装 Go 1.19+
+2. 安装 Node.js 和 Yarn（用于前端开发）
+3. Fork 项目并创建功能分支
+
+### 代码规范
+- 遵循项目现有的代码风格
+- 添加必要的测试用例
+- 确保所有测试通过：`go test ./...`
+- 运行代码格式化：`go fmt ./...`
+
+### 提交 Pull Request
+1. 编写清晰的提交信息
+2. 关联相关 Issue（如果有）
 
 ## 计划
 
