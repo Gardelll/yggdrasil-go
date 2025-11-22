@@ -22,6 +22,7 @@ import (
 	"fmt"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/wneessen/go-mail"
+	"regexp"
 	"text/template"
 	"yggdrasil-go/model"
 	"yggdrasil-go/util"
@@ -67,9 +68,23 @@ type regTokenServiceImpl struct {
 	resetPasswordTemplate *template.Template
 }
 
+// removeHtmlComments removes HTML comments from a string using regex
+// This matches <!-- ... --> patterns including multiline comments
+func removeHtmlComments(htmlContent string) string {
+	// Regex pattern to match HTML comments: <!-- ... -->
+	// The (?s) flag makes . match newlines as well
+	commentRegex := regexp.MustCompile(`(?s)<!--.*?-->`)
+	return commentRegex.ReplaceAllString(htmlContent, "")
+}
+
 func NewRegTokenService(smtpCfg *SmtpConfig) RegTokenService {
 	cache, _ := lru.New(10000000)
-	impl := &regTokenServiceImpl{
+
+	// Remove HTML comments from templates
+	registerTemplate := removeHtmlComments(smtpCfg.RegisterTemplate)
+	resetPasswordTemplate := removeHtmlComments(smtpCfg.ResetPasswordTemplate)
+
+	impl := regTokenServiceImpl{
 		tokenCache:            cache,
 		smtpEnabled:           smtpCfg.Enabled,
 		smtpServer:            smtpCfg.SmtpServer,
@@ -79,10 +94,10 @@ func NewRegTokenService(smtpCfg *SmtpConfig) RegTokenService {
 		smtpPassword:          smtpCfg.SmtpPassword,
 		emailFrom:             smtpCfg.EmailFrom,
 		titlePrefix:           smtpCfg.TitlePrefix,
-		registerTemplate:      template.Must(template.New("register").Parse(smtpCfg.RegisterTemplate)),
-		resetPasswordTemplate: template.Must(template.New("resetPassword").Parse(smtpCfg.ResetPasswordTemplate)),
+		registerTemplate:      template.Must(template.New("register").Parse(registerTemplate)),
+		resetPasswordTemplate: template.Must(template.New("resetPassword").Parse(resetPasswordTemplate)),
 	}
-	return impl
+	return &impl
 }
 
 func (r *regTokenServiceImpl) SendTokenEmail(tokenType RegTokenType, email string) error {
