@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2022-2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,158 +20,81 @@ package util
 import (
 	"bytes"
 	"context"
-	"encoding/json"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"net/http"
+	"time"
 )
 
-func GetObject(url string, value interface{}) error {
-	resp, err := http.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusNoContent {
-		return &YggdrasilError{
-			Status:       http.StatusNoContent,
-			ErrorCode:    "IllegalArgumentException",
-			ErrorMessage: "Http No Content",
-		}
-	} else if resp.StatusCode/100 == 4 {
-		decoder := json.NewDecoder(resp.Body)
-		errResp := YggdrasilError{}
-		err = decoder.Decode(&errResp)
-		if err != nil {
-			return err
-		}
-		return errResp
-	} else {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return json.Unmarshal(body, value)
-	}
+// HTTPResponse represents a generic HTTP response with raw body
+type HTTPResponse struct {
+	StatusCode int
+	Body       []byte
+	Duration   time.Duration
+	IsSuccess  bool
+	Error      error
 }
 
-func GetForString(url string) (string, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusNoContent {
-		return "", nil
-	} else if resp.StatusCode/100 == 4 {
-		decoder := json.NewDecoder(resp.Body)
-		errResp := YggdrasilError{}
-		err = decoder.Decode(&errResp)
-		if err != nil {
-			return "", err
-		}
-		return "", errResp
-	} else {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return "", err
-		}
-		return string(body), nil
-	}
-}
+// DoHTTPRequestWithContext performs an HTTP request with context and timeout support
+func DoHTTPRequestWithContext(ctx context.Context, client *http.Client, method, url string, body []byte, timeout time.Duration) (*HTTPResponse, error) {
+	// Create request context with timeout
+	reqCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
-func PostObject(url string, data interface{}, result interface{}) error {
-	buf := bytes.Buffer{}
-	encoder := json.NewEncoder(&buf)
-	err := encoder.Encode(data)
-	if err != nil {
-		return err
-	}
-	resp, err := http.Post(url, "application/json", &buf)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusNoContent {
-		return &YggdrasilError{
-			Status:       http.StatusNoContent,
-			ErrorCode:    "IllegalArgumentException",
-			ErrorMessage: "Http No Content",
-		}
-	} else if resp.StatusCode/100 == 4 {
-		decoder := json.NewDecoder(resp.Body)
-		errResp := YggdrasilError{}
-		err = decoder.Decode(&errResp)
-		if err != nil {
-			return err
-		}
-		return errResp
+	// Create HTTP request
+	var req *http.Request
+	var err error
+	if body != nil && len(body) > 0 {
+		req, err = http.NewRequestWithContext(reqCtx, method, url, bytes.NewReader(body))
 	} else {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return json.Unmarshal(body, result)
+		req, err = http.NewRequestWithContext(reqCtx, method, url, nil)
 	}
-}
 
-func PostObjectForError(url string, data interface{}) error {
-	buf := bytes.Buffer{}
-	encoder := json.NewEncoder(&buf)
-	err := encoder.Encode(data)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	resp, err := http.Post(url, "application/json", &buf)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusNoContent {
-		return nil
-	} else {
-		decoder := json.NewDecoder(resp.Body)
-		errResp := YggdrasilError{}
-		err = decoder.Decode(&errResp)
-		if err != nil {
-			return err
-		}
-		return errResp
-	}
-}
 
-func PostForString(url string, accessToken string, data []byte, value interface{}) error {
-	reader := bytes.NewReader(data)
-	request, err := http.NewRequestWithContext(context.Background(), "POST", url, reader)
-	if err != nil {
-		return err
+	if method == "POST" || method == "PUT" || method == "PATCH" {
+		// Set headers
+		req.Header.Set("Content-Type", "application/json")
 	}
-	if accessToken != "" {
-		request.Header.Set("Authorization", "Bearer "+accessToken)
-	}
-	resp, err := http.DefaultClient.Do(request)
+
+	// Execute request
+	start := time.Now()
+	resp, err := client.Do(req)
+	duration := time.Since(start)
+
 	if err != nil {
-		return err
+		return &HTTPResponse{
+			Duration:  duration,
+			IsSuccess: false,
+			Error:     fmt.Errorf("request failed: %w", err),
+		}, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusNoContent {
-		return nil
-	} else if resp.StatusCode/100 == 4 {
-		errResp := YggdrasilError{}
-		if resp.ContentLength <= 0 {
-			errResp.Status = resp.StatusCode
-			return errResp
-		}
-		decoder := json.NewDecoder(resp.Body)
-		err = decoder.Decode(&errResp)
-		if err != nil {
-			return err
-		}
-		return errResp
-	} else {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return json.Unmarshal(body, value)
+
+	// Read response body
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return &HTTPResponse{
+			StatusCode: resp.StatusCode,
+			Duration:   duration,
+			IsSuccess:  false,
+			Error:      fmt.Errorf("failed to read response body: %w", err),
+		}, err
 	}
+
+	// Build response
+	httpResp := &HTTPResponse{
+		StatusCode: resp.StatusCode,
+		Body:       respBody,
+		Duration:   duration,
+		IsSuccess:  resp.StatusCode >= 200 && resp.StatusCode < 300,
+	}
+
+	if !httpResp.IsSuccess {
+		httpResp.Error = fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	return httpResp, nil
 }

@@ -21,7 +21,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strings"
-	"yggdrasil-go/model"
+	"yggdrasil-go/dto"
 	"yggdrasil-go/service"
 	"yggdrasil-go/util"
 )
@@ -59,81 +59,14 @@ func NewUserRouter(userService service.UserService, skinRootUrl string) UserRout
 	return &userRouter
 }
 
-type RegRequest struct {
-	Username    string `json:"username" binding:"required,email"`
-	Password    string `json:"password" binding:"required"`
-	ProfileName string `json:"profileName" binding:"required"`
-}
-
-type MinecraftAgent struct {
-	Name    string `json:"name"`
-	Version int    `json:"version"`
-}
-
-type ClientTokenBase struct {
-	ClientToken *string `json:"clientToken,omitempty"`
-}
-
-type AccessTokenBase struct {
-	AccessToken string `json:"accessToken" binding:"required"`
-}
-
-type DualTokenBase struct {
-	AccessTokenBase
-	ClientTokenBase
-}
-
-type LoginRequest struct {
-	ClientTokenBase
-	Username    string          `json:"username" binding:"required,email"`
-	Password    string          `json:"password" binding:"required"`
-	RequestUser bool            `json:"requestUser"`
-	Agent       *MinecraftAgent `json:"agent,omitempty"`
-}
-
-type RefreshRequest struct {
-	DualTokenBase
-	RequestUser     bool                   `json:"requestUser"`
-	SelectedProfile *model.ProfileResponse `json:"selectedProfile,omitempty"`
-}
-
-type ValidateRequest struct {
-	DualTokenBase
-}
-
-type ChangeProfileRequest struct {
-	DualTokenBase
-	ChangeTo string `json:"changeTo" binding:"required"`
-}
-
-type InvalidateRequest struct {
-	AccessTokenBase
-}
-
-type SignoutRequest struct {
-	Username string `json:"username" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
-}
-
-type SendEmailRequest struct {
-	Email     string `json:"email" binding:"required,email"`
-	EmailType string `json:"emailType" binding:"required"`
-}
-
-type PasswordResetRequest struct {
-	Email       string `json:"email" binding:"required,email"`
-	Password    string `json:"password" binding:"required"`
-	AccessToken string `json:"accessToken" binding:"required"`
-}
-
 func (u *userRouterImpl) Register(c *gin.Context) {
-	request := RegRequest{}
+	request := dto.RegRequest{}
 	err := c.ShouldBindJSON(&request)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusForbidden, util.NewForbiddenOperationError(err.Error()))
 		return
 	}
-	response, err := u.userService.Register(request.Username, request.Password, request.ProfileName, c.ClientIP())
+	response, err := u.userService.Register(c.Request.Context(), request.Username, request.Password, request.ProfileName, c.ClientIP())
 	if err != nil {
 		util.HandleError(c, err)
 		return
@@ -142,7 +75,7 @@ func (u *userRouterImpl) Register(c *gin.Context) {
 }
 
 func (u *userRouterImpl) Login(c *gin.Context) {
-	request := LoginRequest{}
+	request := dto.LoginRequest{}
 	err := c.ShouldBindJSON(&request)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusForbidden, util.NewForbiddenOperationError(err.Error()))
@@ -157,13 +90,13 @@ func (u *userRouterImpl) Login(c *gin.Context) {
 }
 
 func (u *userRouterImpl) ChangeProfile(c *gin.Context) {
-	request := ChangeProfileRequest{}
+	request := dto.ChangeProfileRequest{}
 	err := c.ShouldBindJSON(&request)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusForbidden, util.NewForbiddenOperationError(err.Error()))
 		return
 	}
-	err = u.userService.ChangeProfile(request.AccessToken, request.ClientToken, request.ChangeTo)
+	err = u.userService.ChangeProfile(c.Request.Context(), request.AccessToken, request.ClientToken, request.ChangeTo)
 	if err != nil {
 		util.HandleError(c, err)
 		return
@@ -172,7 +105,7 @@ func (u *userRouterImpl) ChangeProfile(c *gin.Context) {
 }
 
 func (u *userRouterImpl) Refresh(c *gin.Context) {
-	request := RefreshRequest{}
+	request := dto.RefreshRequest{}
 	err := c.ShouldBindJSON(&request)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusForbidden, util.NewForbiddenOperationError(err.Error()))
@@ -187,7 +120,7 @@ func (u *userRouterImpl) Refresh(c *gin.Context) {
 }
 
 func (u *userRouterImpl) Validate(c *gin.Context) {
-	request := ValidateRequest{}
+	request := dto.ValidateRequest{}
 	err := c.ShouldBindJSON(&request)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusForbidden, util.NewForbiddenOperationError(err.Error()))
@@ -202,7 +135,7 @@ func (u *userRouterImpl) Validate(c *gin.Context) {
 }
 
 func (u *userRouterImpl) Invalidate(c *gin.Context) {
-	request := InvalidateRequest{}
+	request := dto.InvalidateRequest{}
 	err := c.ShouldBindJSON(&request)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusForbidden, util.NewForbiddenOperationError(err.Error()))
@@ -217,7 +150,7 @@ func (u *userRouterImpl) Invalidate(c *gin.Context) {
 }
 
 func (u *userRouterImpl) Signout(c *gin.Context) {
-	request := SignoutRequest{}
+	request := dto.SignoutRequest{}
 	err := c.ShouldBindJSON(&request)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusForbidden, util.NewForbiddenOperationError(err.Error()))
@@ -233,7 +166,7 @@ func (u *userRouterImpl) Signout(c *gin.Context) {
 
 func (u *userRouterImpl) UsernameToUUID(c *gin.Context) {
 	username := c.Param("username")
-	response, err := u.userService.UsernameToUUID(username)
+	response, err := u.userService.UsernameToUUID(c.Request.Context(), username)
 	if err != nil {
 		util.HandleError(c, err)
 		return
@@ -252,7 +185,7 @@ func (u *userRouterImpl) UUIDToUUID(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, util.NewIllegalArgumentError(err.Error()))
 		return
 	}
-	response, err := u.userService.UUIDToUUID(profileId)
+	response, err := u.userService.UUIDToUUID(c.Request.Context(), profileId)
 	if err != nil {
 		util.HandleError(c, err)
 		return
@@ -271,7 +204,7 @@ func (u *userRouterImpl) QueryUUIDs(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusForbidden, util.NewForbiddenOperationError(err.Error()))
 		return
 	}
-	response, err := u.userService.QueryUUIDs(request)
+	response, err := u.userService.QueryUUIDs(c.Request.Context(), request)
 	if err != nil {
 		util.HandleError(c, err)
 		return
@@ -293,7 +226,7 @@ func (u *userRouterImpl) QueryProfile(c *gin.Context) {
 	} else {
 		textureBaseUrl = c.Request.URL.Scheme + "://" + c.Request.URL.Hostname() + "/textures"
 	}
-	response, err := u.userService.QueryProfile(profileId, unsigned, textureBaseUrl)
+	response, err := u.userService.QueryProfile(c.Request.Context(), profileId, unsigned, textureBaseUrl)
 	if err != nil {
 		util.HandleError(c, err)
 		return
@@ -348,7 +281,7 @@ func (u *userRouterImpl) ProfileKey(c *gin.Context) {
 }
 
 func (u *userRouterImpl) SendEmail(c *gin.Context) {
-	var request SendEmailRequest
+	var request dto.SendEmailRequest
 	err := c.ShouldBindJSON(&request)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusForbidden, util.NewForbiddenOperationError(err.Error()))
@@ -384,7 +317,7 @@ func (u *userRouterImpl) VerifyEmail(c *gin.Context) {
 }
 
 func (u *userRouterImpl) ResetPassword(c *gin.Context) {
-	var request PasswordResetRequest
+	var request dto.PasswordResetRequest
 	err := c.ShouldBindJSON(&request)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusForbidden, util.NewForbiddenOperationError(err.Error()))

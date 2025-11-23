@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2022-2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,6 +20,7 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"yggdrasil-go/dto"
 	"yggdrasil-go/model"
 	"yggdrasil-go/service"
 	"yggdrasil-go/util"
@@ -41,11 +42,6 @@ func NewTextureRouter(textureService service.TextureService) TextureRouter {
 	return &textureRouter
 }
 
-type SetTextureRequest struct {
-	Url   string `json:"url" binding:"required,url"`
-	Model string `json:"model" binding:"oneof=slim default"`
-}
-
 func (t *textureRouterImpl) GetTexture(c *gin.Context) {
 	hash := c.Param("hash")
 	response, err := t.textureService.GetTexture(hash)
@@ -58,7 +54,7 @@ func (t *textureRouterImpl) GetTexture(c *gin.Context) {
 }
 
 func (t *textureRouterImpl) SetTexture(c *gin.Context) {
-	request := SetTextureRequest{Model: string(model.STEVE)}
+	request := dto.SetTextureRequest{Model: string(model.STEVE)}
 	err := c.ShouldBindJSON(&request)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusForbidden, util.NewForbiddenOperationError(err.Error()))

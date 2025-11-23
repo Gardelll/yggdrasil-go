@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"github.com/google/uuid"
 	"time"
+	"yggdrasil-go/dto"
 	"yggdrasil-go/util"
 )
 
@@ -73,16 +74,13 @@ func (u *User) SetProfile(p *Profile) {
 	u.SerializedTextures = string(serialized)
 }
 
-type UserResponse struct {
-	Username   string                `json:"username,omitempty"`
-	Properties []util.StringProperty `json:"properties"`
-	Id         string                `json:"id,omitempty"`
-}
+// UserResponse moved to dto package
+type UserResponse = dto.UserResponse
 
-func (u *User) ToResponse() UserResponse {
+func (u *User) ToResponse() dto.UserResponse {
 	return UserResponse{
 		Id:         util.UnsignedString(u.ID),
 		Username:   u.ProfileName,
-		Properties: make([]util.StringProperty, 0),
+		Properties: make([]dto.StringProperty, 0),
 	}
 }

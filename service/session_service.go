@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2022-2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,34 +18,36 @@
 package service
 
 import (
-	"fmt"
+	"context"
 	lru "github.com/hashicorp/golang-lru"
 	"net/http"
-	"net/url"
+	"yggdrasil-go/dto"
 	"yggdrasil-go/model"
 	"yggdrasil-go/util"
 )
 
 type SessionService interface {
-	JoinServer(accessToken string, serverId string, selectedProfile string, ip string) error
-	HasJoinedServer(serverId string, username string, ip string, textureBaseUrl string) (map[string]interface{}, error)
+	JoinServer(ctx context.Context, accessToken string, serverId string, selectedProfile string, ip string) error
+	HasJoinedServer(ctx context.Context, serverId string, username string, ip string, textureBaseUrl string) (*dto.CompleteProfileResponse, error)
 }
 
 type sessionStore struct {
-	sessionCache *lru.Cache
-	tokenService TokenService
+	sessionCache    *lru.Cache
+	tokenService    TokenService
+	upstreamService IUpstreamService // Upstream authentication service (optional)
 }
 
-func NewSessionService(service TokenService) SessionService {
+func NewSessionService(service TokenService, upstreamService IUpstreamService) SessionService {
 	cache, _ := lru.New(100000)
 	store := sessionStore{
-		sessionCache: cache,
-		tokenService: service,
+		sessionCache:    cache,
+		tokenService:    service,
+		upstreamService: upstreamService,
 	}
 	return &store
 }
 
-func (s *sessionStore) JoinServer(accessToken string, serverId string, selectedProfile string, ip string) error {
+func (s *sessionStore) JoinServer(ctx context.Context, accessToken string, serverId string, selectedProfile string, ip string) error {
 	token, ok := s.tokenService.GetToken(accessToken)
 	if ok {
 		if token.GetAvailableLevel() != model.Valid ||
@@ -55,20 +57,21 @@ func (s *sessionStore) JoinServer(accessToken string, serverId string, selectedP
 		session := model.NewAuthenticationSession(serverId, token, ip)
 		s.sessionCache.Add(serverId, &session)
 	} else {
-		data := map[string]string{
-			"accessToken":     accessToken,
-			"selectedProfile": selectedProfile,
-			"serverId":        serverId,
+		// Use upstream service if configured (tasks.md T018)
+		// Forward the join request to upstream authentication service
+		// Pass all parameters from the original API request
+		if s.upstreamService != nil {
+			err := s.upstreamService.VerifySession(ctx, accessToken, selectedProfile, serverId)
+			if err != nil {
+				return err
+			}
 		}
-		err := util.PostObjectForError("https://sessionserver.mojang.com/session/minecraft/join", data)
-		if err != nil {
-			return err
-		}
+		// Note: In degraded mode (no upstream), session verification is skipped
 	}
 	return nil
 }
 
-func (s *sessionStore) HasJoinedServer(serverId string, username string, ip string, textureBaseUrl string) (map[string]interface{}, error) {
+func (s *sessionStore) HasJoinedServer(ctx context.Context, serverId string, username string, ip string, textureBaseUrl string) (*dto.CompleteProfileResponse, error) {
 	if value, ok := s.sessionCache.Get(serverId); ok {
 		if session, ok := value.(*model.AuthenticationSession); ok {
 			if !(session.HasExpired() && s.sessionCache.Remove(serverId)) &&
@@ -77,17 +80,23 @@ func (s *sessionStore) HasJoinedServer(serverId string, username string, ip stri
 			}
 		}
 	} else {
-		m := make(map[string]interface{})
-		includeIp := ""
-		if ip != "" {
-			includeIp = "&ip=" + url.QueryEscape(ip)
+		// Use upstream service if configured (tasks.md T018)
+		if s.upstreamService != nil {
+			var ipPtr *string
+			if ip != "" {
+				ipPtr = &ip
+			}
+			joinedResp, err := s.upstreamService.HasJoined(ctx, username, serverId, ipPtr)
+			if err != nil {
+				return nil, err
+			}
+			if joinedResp != nil {
+				// JoinedResponse is now an alias of CompleteProfileResponse
+				return joinedResp, nil
+			}
 		}
-		err := util.GetObject(fmt.Sprintf("https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s%s", url.QueryEscape(username), url.QueryEscape(serverId), includeIp), &m)
-		if err != nil {
-			return nil, err
-		} else {
-			return m, nil
-		}
+		// Degraded mode: no upstream configured
+		return nil, util.YggdrasilError{Status: http.StatusNoContent}
 	}
 	return nil, util.YggdrasilError{Status: http.StatusNoContent}
 }

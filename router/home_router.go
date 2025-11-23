@@ -22,39 +22,9 @@ import (
 	"encoding/pem"
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"yggdrasil-go/util"
+	"yggdrasil-go/dto"
+	"yggdrasil-go/service"
 )
-
-type MetaInfo struct {
-	ImplementationName    string `json:"implementationName,omitempty"`
-	ImplementationVersion string `json:"implementationVersion,omitempty"`
-	ServerName            string `json:"serverName,omitempty"`
-	Links                 struct {
-		Homepage string `json:"homepage,omitempty"`
-		Register string `json:"register,omitempty"`
-	} `json:"links"`
-	FeatureNonEmailLogin            bool `json:"feature.non_email_login,omitempty"`
-	FeatureLegacySkinApi            bool `json:"feature.legacy_skin_api,omitempty"`
-	FeatureNoMojangNamespace        bool `json:"feature.no_mojang_namespace,omitempty"`
-	FeatureEnableProfileKey         bool `json:"feature.enable_profile_key,omitempty"`
-	FeatureEnableMojangAntiFeatures bool `json:"feature.enable_mojang_anti_features,omitempty"`
-}
-
-type ServerMeta struct {
-	Meta               MetaInfo `json:"meta"`
-	SkinDomains        []string `json:"skinDomains"`
-	SignaturePublickey string   `json:"signaturePublickey"`
-}
-
-type KeyPair struct {
-	PrivateKey string `json:"privateKey,omitempty"`
-	PublicKey  string `json:"publicKey,omitempty"`
-}
-
-type PublicKeys struct {
-	ProfilePropertyKeys   []KeyPair `json:"profilePropertyKeys,omitempty"`
-	PlayerCertificateKeys []KeyPair `json:"playerCertificateKeys,omitempty"`
-}
 
 type HomeRouter interface {
 	Home(c *gin.Context)
@@ -62,16 +32,18 @@ type HomeRouter interface {
 }
 
 type homeRouterImpl struct {
-	serverMeta   ServerMeta
-	myPubKey     KeyPair
-	cachedPubKey *PublicKeys
+	serverMeta      dto.ServerMeta
+	myPubKey        dto.KeyPair
+	cachedPubKey    *dto.PublicKeys
+	upstreamService service.IUpstreamService // Upstream authentication service (optional)
 }
 
-func NewHomeRouter(meta *ServerMeta) HomeRouter {
+func NewHomeRouter(meta *dto.ServerMeta, upstreamService service.IUpstreamService) HomeRouter {
 	signaturePubKey, _ := pem.Decode([]byte(meta.SignaturePublickey))
 	homeRouter := homeRouterImpl{
-		serverMeta: *meta,
-		myPubKey:   KeyPair{PublicKey: base64.StdEncoding.EncodeToString(signaturePubKey.Bytes)},
+		serverMeta:      *meta,
+		myPubKey:        dto.KeyPair{PublicKey: base64.StdEncoding.EncodeToString(signaturePubKey.Bytes)},
+		upstreamService: upstreamService,
 	}
 	return &homeRouter
 }
@@ -86,12 +58,27 @@ func (h *homeRouterImpl) PublicKeys(c *gin.Context) {
 		c.JSON(http.StatusOK, h.cachedPubKey)
 		return
 	}
-	publicKeys := PublicKeys{}
-	err := util.GetObject("https://api.minecraftservices.com/publickeys", &publicKeys)
-	if err != nil {
-		util.HandleError(c, err)
-		return
+	publicKeys := dto.PublicKeys{}
+
+	// Use upstream service if configured (tasks.md T018)
+	if h.upstreamService != nil {
+		upstreamKeys, err := h.upstreamService.GetPublicKeys(c.Request.Context())
+		if err == nil && upstreamKeys != nil {
+			// Convert upstream public keys to our format (structure now matches directly)
+			for _, key := range upstreamKeys.ProfilePropertyKeys {
+				publicKeys.ProfilePropertyKeys = append(publicKeys.ProfilePropertyKeys, dto.KeyPair{
+					PublicKey: key.PublicKey,
+				})
+			}
+			for _, key := range upstreamKeys.PlayerCertificateKeys {
+				publicKeys.PlayerCertificateKeys = append(publicKeys.PlayerCertificateKeys, dto.KeyPair{
+					PublicKey: key.PublicKey,
+				})
+			}
+		}
 	}
+
+	// Always include our own public key
 	publicKeys.ProfilePropertyKeys = append(publicKeys.ProfilePropertyKeys, h.myPubKey)
 	publicKeys.PlayerCertificateKeys = append(publicKeys.PlayerCertificateKeys, h.myPubKey)
 	c.JSON(http.StatusOK, publicKeys)

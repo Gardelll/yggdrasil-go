@@ -18,6 +18,7 @@
 package service
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -30,52 +31,36 @@ import (
 	"golang.org/x/time/rate"
 	"gorm.io/gorm"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strings"
 	"time"
+	"yggdrasil-go/dto"
 	"yggdrasil-go/model"
 	"yggdrasil-go/util"
 )
 
 type UserService interface {
-	Register(username, password, profileName, ip string) (*model.UserResponse, error)
-	Login(username string, password string, clientToken *string, requestUser bool) (*LoginResponse, error)
-	ChangeProfile(accessToken string, clientToken *string, changeTo string) error
-	Refresh(accessToken string, clientToken *string, requestUser bool, selectedProfile *model.ProfileResponse) (*LoginResponse, error)
+	Register(ctx context.Context, username, password, profileName, ip string) (*dto.UserResponse, error)
+	Login(username string, password string, clientToken *string, requestUser bool) (*dto.LoginResponse, error)
+	ChangeProfile(ctx context.Context, accessToken string, clientToken *string, changeTo string) error
+	Refresh(accessToken string, clientToken *string, requestUser bool, selectedProfile *dto.ProfileResponse) (*dto.LoginResponse, error)
 	Validate(accessToken string, clientToken *string) error
 	Invalidate(accessToken string) error
 	Signout(username string, password string) error
-	UsernameToUUID(username string) (*model.ProfileResponse, error)
-	UUIDToUUID(profileId uuid.UUID) (*model.ProfileResponse, error)
-	QueryUUIDs(usernames []string) ([]model.ProfileResponse, error)
-	QueryProfile(profileId uuid.UUID, unsigned bool, textureBaseUrl string) (map[string]interface{}, error)
-	ProfileKey(accessToken string) (*ProfileKeyResponse, error)
+	UsernameToUUID(ctx context.Context, username string) (*dto.ProfileResponse, error)
+	UUIDToUUID(ctx context.Context, profileId uuid.UUID) (*dto.ProfileResponse, error)
+	QueryUUIDs(ctx context.Context, usernames []string) ([]dto.ProfileResponse, error)
+	QueryProfile(ctx context.Context, profileId uuid.UUID, unsigned bool, textureBaseUrl string) (*dto.CompleteProfileResponse, error)
+	ProfileKey(accessToken string) (*dto.ProfileKeyResponse, error)
 	SendEmail(email string, tokenType RegTokenType, ip string) error
 	VerifyEmail(accessToken string) error
 	ResetPassword(email string, password string, accessToken string) error
 }
 
-type LoginResponse struct {
-	User              *model.UserResponse     `json:"user"`
-	ClientToken       string                  `json:"clientToken"`
-	AccessToken       string                  `json:"accessToken"`
-	AvailableProfiles []model.ProfileResponse `json:"availableProfiles,omitempty"`
-	SelectedProfile   *model.ProfileResponse  `json:"selectedProfile"`
-}
-
-type ProfileKeyResponse struct {
-	ExpiresAt            time.Time       `json:"expiresAt,omitempty"`
-	KeyPair              *ProfileKeyPair `json:"keyPair,omitempty"`
-	PublicKeySignature   string          `json:"publicKeySignature,omitempty"`
-	PublicKeySignatureV2 string          `json:"publicKeySignatureV2,omitempty"`
-	RefreshedAfter       time.Time       `json:"refreshedAfter,omitempty"`
-}
-
-type ProfileKeyPair struct {
-	PrivateKey string `json:"privateKey,omitempty"`
-	PublicKey  string `json:"publicKey,omitempty"`
-}
+// Response DTOs moved to dto package
+type LoginResponse = dto.LoginResponse
+type ProfileKeyResponse = dto.ProfileKeyResponse
+type ProfileKeyPair = dto.ProfileKeyPair
 
 type userServiceImpl struct {
 	tokenService    TokenService
@@ -83,10 +68,11 @@ type userServiceImpl struct {
 	db              *gorm.DB
 	limitLruCache   *lru.Cache
 	profileKeyCache *lru.Cache
-	keyPairCh       chan ProfileKeyPair
+	keyPairCh       chan dto.ProfileKeyPair
+	upstreamService IUpstreamService // Upstream authentication service (optional)
 }
 
-func NewUserService(tokenService TokenService, regTokenService RegTokenService, db *gorm.DB) UserService {
+func NewUserService(tokenService TokenService, regTokenService RegTokenService, db *gorm.DB, upstreamService IUpstreamService) UserService {
 	cache0, _ := lru.New(10000)
 	cache1, _ := lru.New(10000)
 	ch := make(chan ProfileKeyPair, 100)
@@ -97,12 +83,13 @@ func NewUserService(tokenService TokenService, regTokenService RegTokenService, 
 		limitLruCache:   cache0,
 		profileKeyCache: cache1,
 		keyPairCh:       ch,
+		upstreamService: upstreamService,
 	}
 	go userService.genKeyPair()
 	return &userService
 }
 
-func (u *userServiceImpl) Register(username, password, profileName, ip string) (*model.UserResponse, error) {
+func (u *userServiceImpl) Register(ctx context.Context, username, password, profileName, ip string) (*model.UserResponse, error) {
 	var count int64
 	if err := u.db.Table("users").Where("email = ?", username).Count(&count).Error; err != nil {
 		return nil, err
@@ -115,7 +102,7 @@ func (u *userServiceImpl) Register(username, password, profileName, ip string) (
 	}
 	if count > 0 {
 		return nil, util.NewForbiddenOperationError("profileName exist")
-	} else if _, err := mojangUsernameToUUID(profileName); err == nil {
+	} else if _, err := u.mojangUsernameToUUID(ctx, profileName); err == nil {
 		return nil, util.NewForbiddenOperationError("profileName duplicate")
 	}
 	matched, err := regexp.MatchString("^\\w+@(\\w){2,}((\\.\\w+)+)$", username)
@@ -206,7 +193,7 @@ func (u *userServiceImpl) Login(username string, password string, clientToken *s
 	return nil, util.NewForbiddenOperationError(util.MessageInvalidCredentials)
 }
 
-func (u *userServiceImpl) ChangeProfile(accessToken string, clientToken *string, changeTo string) error {
+func (u *userServiceImpl) ChangeProfile(ctx context.Context, accessToken string, clientToken *string, changeTo string) error {
 	if u.tokenService.VerifyToken(accessToken, clientToken) != model.Valid {
 		return util.NewForbiddenOperationError(util.MessageInvalidToken)
 	}
@@ -226,7 +213,7 @@ func (u *userServiceImpl) ChangeProfile(accessToken string, clientToken *string,
 	}
 	if count > 0 {
 		return util.NewForbiddenOperationError("profileName exist")
-	} else if _, err := mojangUsernameToUUID(changeTo); err == nil {
+	} else if _, err := u.mojangUsernameToUUID(ctx, changeTo); err == nil {
 		return util.NewForbiddenOperationError("profileName duplicate")
 	}
 	if isInvalidProfileName(changeTo) {
@@ -312,7 +299,7 @@ func (u *userServiceImpl) Signout(username string, password string) error {
 	return util.NewForbiddenOperationError(util.MessageInvalidCredentials)
 }
 
-func (u *userServiceImpl) UsernameToUUID(username string) (*model.ProfileResponse, error) {
+func (u *userServiceImpl) UsernameToUUID(ctx context.Context, username string) (*model.ProfileResponse, error) {
 	user := model.User{}
 	if result := u.db.Where("profile_name = ?", username).First(&user); result.Error == nil {
 		return &model.ProfileResponse{
@@ -320,7 +307,7 @@ func (u *userServiceImpl) UsernameToUUID(username string) (*model.ProfileRespons
 			Id:   util.UnsignedString(user.ID),
 		}, nil
 	} else {
-		response, err := mojangUsernameToUUID(username)
+		response, err := u.mojangUsernameToUUID(ctx, username)
 		if err != nil {
 			return nil, nil
 		} else {
@@ -329,7 +316,7 @@ func (u *userServiceImpl) UsernameToUUID(username string) (*model.ProfileRespons
 	}
 }
 
-func (u *userServiceImpl) UUIDToUUID(profileId uuid.UUID) (*model.ProfileResponse, error) {
+func (u *userServiceImpl) UUIDToUUID(ctx context.Context, profileId uuid.UUID) (*model.ProfileResponse, error) {
 	user := model.User{}
 	if result := u.db.First(&user, profileId); result.Error == nil {
 		return &model.ProfileResponse{
@@ -337,7 +324,7 @@ func (u *userServiceImpl) UUIDToUUID(profileId uuid.UUID) (*model.ProfileRespons
 			Id:   util.UnsignedString(user.ID),
 		}, nil
 	} else {
-		response, err := mojangUUIDToUUID(util.UnsignedString(profileId))
+		response, err := u.mojangUUIDToUUID(ctx, util.UnsignedString(profileId))
 		if err != nil {
 			return nil, nil
 		} else {
@@ -346,7 +333,7 @@ func (u *userServiceImpl) UUIDToUUID(profileId uuid.UUID) (*model.ProfileRespons
 	}
 }
 
-func (u *userServiceImpl) QueryUUIDs(usernames []string) ([]model.ProfileResponse, error) {
+func (u *userServiceImpl) QueryUUIDs(ctx context.Context, usernames []string) ([]model.ProfileResponse, error) {
 	var users []model.User
 	var names []string
 	if len(usernames) > 10 {
@@ -372,15 +359,15 @@ func (u *userServiceImpl) QueryUUIDs(usernames []string) ([]model.ProfileRespons
 		}
 	}
 	if len(notFoundUsers) > 0 {
-		mojangResponses, _ := mojangUsernamesToUUIDs(notFoundUsers)
+		mojangResponses, _ := u.mojangUsernamesToUUIDs(ctx, notFoundUsers)
 		for _, resp := range mojangResponses {
-			responses = append(responses, resp)
+			responses = append(responses, *resp)
 		}
 	}
 	return responses, nil
 }
 
-func (u *userServiceImpl) QueryProfile(profileId uuid.UUID, unsigned bool, textureBaseUrl string) (map[string]interface{}, error) {
+func (u *userServiceImpl) QueryProfile(ctx context.Context, profileId uuid.UUID, unsigned bool, textureBaseUrl string) (*dto.CompleteProfileResponse, error) {
 	user := model.User{}
 	if err := u.db.First(&user, profileId).Error; err == nil {
 		profile, err := user.Profile()
@@ -394,13 +381,19 @@ func (u *userServiceImpl) QueryProfile(profileId uuid.UUID, unsigned bool, textu
 			return response, err
 		}
 	} else {
-		result := map[string]interface{}{}
-		err := util.GetObject(fmt.Sprintf("https://sessionserver.mojang.com/session/minecraft/profile/%s?unsigned=%t", util.UnsignedString(profileId), unsigned), &result)
-		if err != nil {
-			return nil, err
-		} else {
-			return result, nil
+		// Use upstream service if configured (tasks.md T018)
+		if u.upstreamService != nil {
+			upstreamProfile, err := u.upstreamService.LookupProfile(ctx, util.UnsignedString(profileId), unsigned)
+			if err != nil {
+				return nil, err
+			}
+			if upstreamProfile != nil {
+				// UpstreamProfileResponse is now an alias of CompleteProfileResponse
+				return upstreamProfile, nil
+			}
 		}
+		// Degraded mode or profile not found
+		return nil, util.YggdrasilError{Status: http.StatusNoContent}
 	}
 }
 
@@ -412,7 +405,7 @@ func (u *userServiceImpl) ProfileKey(accessToken string) (resp *ProfileKeyRespon
 	} else {
 		id, _, err := util.ParseOfficialToken(accessToken)
 		if err != nil {
-			return nil, err
+			id = util.UnsignedString(uuid.NewMD5(uuid.Nil, []byte(accessToken)))
 		}
 		profileId, err = util.ToUUID(id)
 		if err != nil {
@@ -575,34 +568,66 @@ func (u *userServiceImpl) genKeyPair() {
 	}
 }
 
-func mojangUsernameToUUID(username string) (model.ProfileResponse, error) {
+// mojangUsernameToUUID has been converted to a method to use upstreamService (tasks.md T018)
+func (u *userServiceImpl) mojangUsernameToUUID(ctx context.Context, username string) (model.ProfileResponse, error) {
 	response := model.ProfileResponse{}
-	reqUrl := fmt.Sprintf("https://api.minecraftservices.com/minecraft/profile/lookup/name/%s", url.PathEscape(username))
-	err := util.GetObject(reqUrl, &response)
-	if err != nil {
-		return response, err
-	} else {
-		return response, nil
+
+	// Use upstream service if configured
+	if u.upstreamService != nil {
+		upstreamProfile, err := u.upstreamService.LookupByName(ctx, username)
+		if err != nil {
+			return response, err
+		}
+		if upstreamProfile != nil {
+			response.Id = upstreamProfile.ID
+			response.Name = upstreamProfile.Name
+			return response, nil
+		}
 	}
+
+	// Degraded mode: return empty response
+	return response, util.YggdrasilError{Status: http.StatusNoContent}
 }
 
-func mojangUUIDToUUID(uid string) (model.ProfileResponse, error) {
+// mojangUUIDToUUID has been converted to a method to use upstreamService (tasks.md T018)
+func (u *userServiceImpl) mojangUUIDToUUID(ctx context.Context, uid string) (model.ProfileResponse, error) {
 	response := model.ProfileResponse{}
-	reqUrl := fmt.Sprintf("https://api.minecraftservices.com/minecraft/profile/lookup/%s", uid)
-	err := util.GetObject(reqUrl, &response)
-	if err != nil {
-		return response, err
-	} else {
-		return response, nil
+
+	// Use upstream service if configured
+	if u.upstreamService != nil {
+		upstreamProfile, err := u.upstreamService.LookupByUUID(ctx, uid)
+		if err != nil {
+			return response, err
+		}
+		if upstreamProfile != nil {
+			response.Id = upstreamProfile.ID
+			response.Name = upstreamProfile.Name
+			return response, nil
+		}
 	}
+
+	// Degraded mode: return empty response
+	return response, util.YggdrasilError{Status: http.StatusNoContent}
 }
 
-func mojangUsernamesToUUIDs(username []string) ([]model.ProfileResponse, error) {
-	response := make([]model.ProfileResponse, 0)
-	err := util.PostObject("https://api.minecraftservices.com/minecraft/profile/lookup/bulk/byname", username, &response)
-	if err != nil {
-		return response, err
-	} else {
-		return response, nil
+// mojangUsernamesToUUIDs has been converted to a method to use upstreamService (tasks.md T018)
+func (u *userServiceImpl) mojangUsernamesToUUIDs(ctx context.Context, username []string) ([]*dto.ProfileResponse, error) {
+	response := make([]*dto.ProfileResponse, 0)
+
+	// Use upstream service if configured
+	if u.upstreamService != nil {
+		upstreamProfiles, err := u.upstreamService.LookupBulkProfiles(ctx, username)
+		if err != nil {
+			return response, err
+		}
+		if upstreamProfiles != nil {
+			for _, upstreamProfile := range upstreamProfiles {
+				response = append(response, upstreamProfile)
+			}
+			return response, nil
+		}
 	}
+
+	// Degraded mode: return empty slice
+	return response, nil
 }

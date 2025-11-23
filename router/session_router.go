@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2022-2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -21,6 +21,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strings"
+	"yggdrasil-go/dto"
 	"yggdrasil-go/service"
 	"yggdrasil-go/util"
 )
@@ -43,21 +44,15 @@ func NewSessionRouter(sessionService service.SessionService, skinRootUrl string)
 	return &sessionRouter
 }
 
-type JoinServerRequest struct {
-	AccessToken     string `json:"accessToken" binding:"required"`
-	SelectedProfile string `json:"selectedProfile" binding:"required"`
-	ServerId        string `json:"serverId" binding:"required"`
-}
-
 func (s *sessionRouterImpl) JoinServer(c *gin.Context) {
-	request := JoinServerRequest{}
+	request := dto.JoinServerRequest{}
 	err := c.ShouldBindJSON(&request)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusForbidden, util.NewForbiddenOperationError(err.Error()))
 		return
 	}
 	ip := c.ClientIP()
-	err = s.sessionService.JoinServer(request.AccessToken, request.ServerId, request.SelectedProfile, ip)
+	err = s.sessionService.JoinServer(c.Request.Context(), request.AccessToken, request.ServerId, request.SelectedProfile, ip)
 	if err != nil {
 		util.HandleError(c, err)
 		return
@@ -75,7 +70,7 @@ func (s *sessionRouterImpl) HasJoinedServer(c *gin.Context) {
 	} else {
 		textureBaseUrl = c.Request.URL.Scheme + "://" + c.Request.URL.Hostname() + "/textures"
 	}
-	response, err := s.sessionService.HasJoinedServer(serverId, username, ip, textureBaseUrl)
+	response, err := s.sessionService.HasJoinedServer(c.Request.Context(), serverId, username, ip, textureBaseUrl)
 	if err != nil {
 		util.HandleError(c, err)
 		return

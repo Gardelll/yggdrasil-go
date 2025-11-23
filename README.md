@@ -93,6 +93,11 @@ java -javaagent:authlib-injector.jar=http://localhost:8080 -Dauthlibinjector.dis
 3. 后端服务端设置 `online-mode=false`
 4. 在 BungeeCord/Velocity 上开启 `enforce-secure-chat=false`
 
+### 7. 自定义认证服务器上游
+在配置文件中可以配置上游认证服务器的端点，也支持配置非 Mojang 官方认证服务器。
+但是若用户使用配置的上游认证服务器认证，仅能保证进服，不能保证皮肤和聊天签名可用。
+上游认证服务器可在配置中完全关闭，关闭后将完全不验证上游，仅考虑本地账号。
+
 ### 注意事项
 - 确保认证服务器可通过公共网络访问
 - Minecraft 1.19+ 版本必须正确设置 `enforce-secure-profile`
@@ -104,13 +109,7 @@ java -javaagent:authlib-injector.jar=http://localhost:8080 -Dauthlibinjector.dis
 本实现在完全兼容 [Yggdrasil 服务端技术规范](https://github.com/yushijinhun/authlib-injector/wiki/Yggdrasil-%E6%9C%8D%E5%8A%A1%E7%AB%AF%E6%8A%80%E6%9C%AF%E8%A7%84%E8%8C%83) 的基础上，还提供了额外的扩展功能：
 
 ### 核心规范兼容性
-**100% 实现** - 所有12个核心API端点均已完全实现，无缺失或重大差异
-
-### 扩展功能（16个额外端点）
-1. **用户管理扩展**（5个）: 注册、邮箱验证、密码重置、角色切换
-2. **材质管理扩展**（3个）: 材质文件下载、URL设置、重复路径
-3. **Minecraft 1.19+兼容**（4个）: 玩家属性、隐私设置、消息签名
-4. **Mojang API兼容**（4个）: profile lookup系列端点
+**100% 实现** - 所有12个核心API端点均已完全实现
 
 ### 实现细节差异
 1. **离线登录兼容性**（中影响）：未采用与Mojang离线验证兼容的UUID生成方式，可能影响从离线验证系统迁移的用户数据兼容性
@@ -124,6 +123,19 @@ java -javaagent:authlib-injector.jar=http://localhost:8080 -Dauthlibinjector.dis
 1. 安装 Go 1.19+
 2. 安装 Node.js 和 Yarn（用于前端开发）
 3. Fork 项目并创建功能分支
+
+### 启动后端服务
+
+```shell
+go run -tags='sqlite' main.go
+```
+
+### 启动前端服务
+
+```shell
+cd frontend
+yarn dev
+```
 
 ### 代码规范
 - 遵循项目现有的代码风格
@@ -140,5 +152,5 @@ java -javaagent:authlib-injector.jar=http://localhost:8080 -Dauthlibinjector.dis
 - [x] 支持密码重置
 - [x] 支持不同的数据库如 PostgreSQL 等
 - [x] SMTP配置可选化（无SMTP时自动禁用邮箱验证）
-- [ ] 添加选项以支持完全离线模式（不检查 Mojang 接口）
+- [x] 添加选项以支持完全离线模式（不检查 Mojang 接口）或多个上游认证服务器
 - [ ] 令牌持久化防止升级和重启时令牌生效

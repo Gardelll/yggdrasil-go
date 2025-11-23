@@ -18,6 +18,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 	"yggdrasil-go/model"
 
@@ -46,7 +47,7 @@ func TestRegisterWithoutSMTP(t *testing.T) {
 	}
 	regTokenService := NewRegTokenService(smtpConfig)
 	tokenService := NewTokenService()
-	userService := NewUserService(tokenService, regTokenService, db)
+	userService := NewUserService(tokenService, regTokenService, db, nil) // No upstream service for tests
 
 	// Test registration
 	username := "test@example.com"
@@ -54,7 +55,7 @@ func TestRegisterWithoutSMTP(t *testing.T) {
 	profileName := "YggTestUser001"
 	ip := "127.0.0.1"
 
-	response, err := userService.Register(username, password, profileName, ip)
+	response, err := userService.Register(context.Background(), username, password, profileName, ip)
 	if err != nil {
 		t.Fatalf("Registration failed: %v", err)
 	}
@@ -109,7 +110,7 @@ func TestRegisterWithSMTP(t *testing.T) {
 	}
 	regTokenService := NewRegTokenService(smtpConfig)
 	tokenService := NewTokenService()
-	userService := NewUserService(tokenService, regTokenService, db)
+	userService := NewUserService(tokenService, regTokenService, db, nil) // No upstream service for tests
 
 	// Test registration
 	username := "test2@example.com"
@@ -117,7 +118,7 @@ func TestRegisterWithSMTP(t *testing.T) {
 	profileName := "YggTestUser002"
 	ip := "127.0.0.1"
 
-	response, err := userService.Register(username, password, profileName, ip)
+	response, err := userService.Register(context.Background(), username, password, profileName, ip)
 	if err != nil {
 		t.Fatalf("Registration failed: %v", err)
 	}
@@ -158,7 +159,7 @@ func TestResetPasswordWithoutSMTP(t *testing.T) {
 	}
 	regTokenService := NewRegTokenService(smtpConfig)
 	tokenService := NewTokenService()
-	userService := NewUserService(tokenService, regTokenService, db)
+	userService := NewUserService(tokenService, regTokenService, db, nil) // No upstream service for tests
 
 	// Create a test user
 	user := model.User{

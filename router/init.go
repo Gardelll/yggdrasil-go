@@ -22,10 +22,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"time"
+	"yggdrasil-go/dto"
 	"yggdrasil-go/service"
 )
 
-func InitRouters(router *gin.Engine, db *gorm.DB, meta *ServerMeta, smtpCfg *service.SmtpConfig, skinRootUrl string) {
+func InitRouters(router *gin.Engine, db *gorm.DB, meta *dto.ServerMeta, smtpCfg *service.SmtpConfig, skinRootUrl string, upstreamService service.IUpstreamService) {
 	router.Use(cors.New(cors.Config{
 		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "HEAD"},
@@ -37,10 +38,10 @@ func InitRouters(router *gin.Engine, db *gorm.DB, meta *ServerMeta, smtpCfg *ser
 
 	tokenService := service.NewTokenService()
 	regTokenService := service.NewRegTokenService(smtpCfg)
-	userService := service.NewUserService(tokenService, regTokenService, db)
-	sessionService := service.NewSessionService(tokenService)
+	userService := service.NewUserService(tokenService, regTokenService, db, upstreamService)
+	sessionService := service.NewSessionService(tokenService, upstreamService)
 	textureService := service.NewTextureService(tokenService, db)
-	homeRouter := NewHomeRouter(meta)
+	homeRouter := NewHomeRouter(meta, upstreamService)
 	userRouter := NewUserRouter(userService, skinRootUrl)
 	sessionRouter := NewSessionRouter(sessionService, skinRootUrl)
 	textureRouter := NewTextureRouter(textureService)

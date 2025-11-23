@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2022-2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"github.com/google/uuid"
 	"time"
+	"yggdrasil-go/dto"
 	"yggdrasil-go/util"
 )
 
@@ -38,21 +39,13 @@ const (
 	ALEX            = "slim"
 )
 
-type MetadataType map[string]interface{}
+// Texture types moved to dto package
+// Keep local type aliases for backward compatibility
 
-type SkinTexture struct {
-	Url      string        `json:"url"`
-	Metadata *MetadataType `json:"metadata,omitempty"`
-}
-
-type CapeTexture struct {
-	Url string `json:"url"`
-}
-
-type TexturesType struct {
-	SKIN *SkinTexture `json:"SKIN,omitempty"`
-	CAPE *CapeTexture `json:"CAPE,omitempty"`
-}
+type MetadataType = dto.MetadataType
+type SkinTexture = dto.SkinTexture
+type CapeTexture = dto.CapeTexture
+type TexturesType = dto.TexturesValue
 
 func NewProfile(id uuid.UUID, name string, modelType ModelType, serializedTextures string) (this Profile) {
 	this.Id = id
@@ -68,19 +61,17 @@ func NewProfile(id uuid.UUID, name string, modelType ModelType, serializedTextur
 	return this
 }
 
-type ProfileResponse struct {
-	Name string `json:"name" binding:"required"`
-	Id   string `json:"id" binding:"required"`
-}
+// ProfileResponse moved to dto package
+type ProfileResponse = dto.ProfileResponse
 
-func (p *Profile) ToSimpleResponse() ProfileResponse {
+func (p *Profile) ToSimpleResponse() dto.ProfileResponse {
 	return ProfileResponse{
 		Id:   util.UnsignedString(p.Id),
 		Name: p.Name,
 	}
 }
 
-func (p *Profile) ToCompleteResponse(signed bool, textureBaseUrl string) (map[string]interface{}, error) {
+func (p *Profile) ToCompleteResponse(signed bool, textureBaseUrl string) (*dto.CompleteProfileResponse, error) {
 	textures := TexturesType{}
 	if hash, ok := p.Textures["SKIN"]; ok {
 		skin := SkinTexture{
@@ -115,13 +106,13 @@ func (p *Profile) ToCompleteResponse(signed bool, textureBaseUrl string) (map[st
 		return nil, err
 	}
 	properties := util.Properties(signed,
-		util.StringProperty{Name: "textures", Value: texturesStr},
-		util.StringProperty{Name: "uploadableTextures", Value: "skin,cape"},
+		dto.StringProperty{Name: "textures", Value: texturesStr},
+		dto.StringProperty{Name: "uploadableTextures", Value: "skin,cape"},
 	)
-	return map[string]interface{}{
-		"id":         util.UnsignedString(p.Id),
-		"name":       p.Name,
-		"properties": properties,
+	return &dto.CompleteProfileResponse{
+		ID:         util.UnsignedString(p.Id),
+		Name:       p.Name,
+		Properties: properties,
 	}, nil
 }
 

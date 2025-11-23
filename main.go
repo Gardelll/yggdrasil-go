@@ -34,6 +34,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"yggdrasil-go/dto"
 	"yggdrasil-go/model"
 	"yggdrasil-go/router"
 	"yggdrasil-go/service"
@@ -123,13 +124,42 @@ func main() {
 		ResetPasswordTemplate: "请访问下面的链接进行密码重置: <pre>" + meta.SkinRootUrl + "/profile/resetPassword#passwordResetToken={{.AccessToken}}</pre>",
 	}
 	err = cfg.Section("smtp").MapTo(&smtpCfg)
+
+	// Default upstream configuration (Mojang official)
+	upstreamCfg := util.UpstreamConfig{
+		PoolSize:        100,
+		RetryInterval:   100,
+		RecoveryTimeout: 600000,
+	}
+	upstreamSection, err := cfg.GetSection("upstream")
+	if upstreamSection != nil {
+		err = upstreamSection.MapTo(&upstreamCfg)
+	}
+
 	_, err = os.Stat(configFilePath)
 	if err != nil && os.IsNotExist(err) {
 		log.Println("配置文件不存在，已使用默认配置")
+
+		upstreamCfg.Services = []string{"mojang"}
+		upstreamMojangCfg := util.UpstreamServiceConfig{
+			Id:              "mojang",
+			ProfileURL:      util.DefaultMojangProfileURL,
+			LookupByNameURL: util.DefaultMojangLookupByNameURL,
+			LookupByUUIDURL: util.DefaultMojangLookupByUUIDURL,
+			BulkLookupURL:   util.DefaultMojangBulkLookupURL,
+			JoinURL:         util.DefaultMojangJoinURL,
+			HasJoinedURL:    util.DefaultMojangHasJoinedURL,
+			PublicKeysURL:   util.DefaultMojangPublicKeysURL,
+			Timeout:         util.DefaultMojangTimeout,
+		}
+
 		_ = cfg.Section("meta").ReflectFrom(&meta)
 		_ = cfg.Section("database").ReflectFrom(&dbCfg)
 		_ = cfg.Section("server").ReflectFrom(&serverCfg)
 		_ = cfg.Section("smtp").ReflectFrom(&smtpCfg)
+		_ = cfg.Section("upstream").ReflectFrom(&upstreamCfg)
+		_ = cfg.Section("upstream_mojang").ReflectFrom(&upstreamMojangCfg)
+
 		err = cfg.SaveToIndent(configFilePath, " ")
 		if err != nil {
 			log.Println("警告: 无法保存配置文件", err)
@@ -157,7 +187,7 @@ func main() {
 	if err != nil {
 		log.Fatal("无法导入数据库", err)
 	}
-	serverMeta := router.ServerMeta{}
+	serverMeta := dto.ServerMeta{}
 	serverMeta.Meta.ServerName = meta.ServerName
 	serverMeta.Meta.ImplementationName = meta.ImplementationName
 	serverMeta.Meta.ImplementationVersion = meta.ImplementationVersion
@@ -200,7 +230,37 @@ func main() {
 		RegisterTemplate:      registerTemplate,
 		ResetPasswordTemplate: resetPasswordTemplate,
 	}
-	router.InitRouters(r, db, &serverMeta, &smtpConfig, meta.SkinRootUrl)
+
+	// Initialize upstream service
+	// Behavior:
+	// - No [upstream] section: Default Mojang upstream (backward compatibility)
+	// - [upstream] section with empty services: Pure local mode (no upstreams)
+	// - [upstream] section with services: Configured upstreams
+	upstreamServiceConfigs, err := util.ParseUpstreamConfig(&upstreamCfg, cfg)
+	if err != nil {
+		log.Fatalf("错误: 无法解析上游服务配置: %v", err)
+	}
+
+	var upstreamService service.IUpstreamService
+	if len(upstreamServiceConfigs) > 0 {
+		upstreamService, err = service.NewUpstreamService(&upstreamCfg, upstreamServiceConfigs)
+
+		if err != nil {
+			log.Fatalf("错误: 无法初始化上游服务: %v", err)
+		}
+
+		// Check if using default Mojang upstream
+		if upstreamSection == nil {
+			log.Printf("上游认证服务已初始化 (默认 Mojang 上游，向后兼容模式)")
+		} else {
+			log.Printf("上游认证服务已初始化 (启用服务: %s)", strings.Join(upstreamCfg.Services, ", "))
+		}
+	} else {
+		log.Println("上游认证服务已禁用 (纯本地模式)")
+		upstreamService = nil
+	}
+
+	router.InitRouters(r, db, &serverMeta, &smtpConfig, meta.SkinRootUrl, upstreamService)
 	r.Static("/profile", "assets")
 	r.NoRoute(func(c *gin.Context) {
 		if strings.HasPrefix(c.Request.URL.Path, "/profile/") {

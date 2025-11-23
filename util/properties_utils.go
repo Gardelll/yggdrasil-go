@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2022-2025. Gardel <sunxinao@hotmail.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -25,16 +25,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"log"
+	"yggdrasil-go/dto"
 )
 
 type Property struct {
 	Name  string
 	Value interface{}
-}
-
-type StringProperty struct {
-	Name  string `json:"name,omitempty"`
-	Value string `json:"value,omitempty"`
 }
 
 // PrivateKey RSA PKCS8 Private Key
@@ -52,16 +48,16 @@ func EncodeBase64(properties ...Property) (string, error) {
 	return base64.StdEncoding.EncodeToString(jsonBytes), nil
 }
 
-func Properties(sign bool, properties ...StringProperty) []map[string]string {
-	list := make([]map[string]string, 0, len(properties))
+func Properties(sign bool, properties ...dto.StringProperty) []dto.StringProperty {
+	list := make([]dto.StringProperty, 0, len(properties))
 	for _, property := range properties {
-		obj := map[string]string{
-			"name":  property.Name,
-			"value": property.Value,
+		obj := dto.StringProperty{
+			Name:  property.Name,
+			Value: property.Value,
 		}
 		if sign {
 			err := error(nil)
-			obj["signature"], err = Sign(property.Value)
+			obj.Signature, err = Sign(property.Value)
 			if err != nil {
 				log.Printf("无法签名字符串 '%s', 原因: %s", property.Value, err.Error())
 			}
