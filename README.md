@@ -56,7 +56,7 @@ docker run -d --name yggdrasil-go -v $(pwd)/data:/app/data -p 8080:8080 gardel/y
    ```
    online-mode=true
    ```
-2. 对于 Minecraft 1.19+ 版本，由于本认证服务器兼容正版验证，使用官方启动器的玩家无法新人本认证服务器的签名密钥，需要设置：
+2. 对于 Minecraft 1.19+ 版本，由于本认证服务器兼容正版验证，使用官方启动器的玩家无法信任本认证服务器的签名密钥，需要设置：
    ```
    enforce-secure-profile=false
    ```
@@ -73,7 +73,7 @@ docker run -d --name yggdrasil-go -v $(pwd)/data:/app/data -p 8080:8080 gardel/y
 例如，如果你将 `authlib-injector.jar` 放在服务端同一目录下，认证服务器运行在 `http://localhost:8080`，则启动命令为：
 
 ```bash
-java -javaagent:authlib-injector.jar=http://localhost:8080 -Dauthlibinjector.disableHttpd -jar minecraft_server.1.12.2.jar nogui
+java -javaagent:authlib-injector.jar=http://localhost:8080 -Dauthlibinjector.disableHttpd -jar minecraft_server.1.21.10.jar nogui
 ```
 
 ### 4. 玩家登录
@@ -106,7 +106,7 @@ java -javaagent:authlib-injector.jar=http://localhost:8080 -Dauthlibinjector.dis
 
 ## 实现差异
 
-本实现在完全兼容 [Yggdrasil 服务端技术规范](https://github.com/yushijinhun/authlib-injector/wiki/Yggdrasil-%E6%9C%8D%E5%8A%A1%E7%AB%AF%E6%8A%80%E6%9C%AF%E8%A7%84%E8%8C%83) 的基础上，还提供了额外的扩展功能：
+本实现完全兼容 [Yggdrasil 服务端技术规范](https://github.com/yushijinhun/authlib-injector/wiki/Yggdrasil-%E6%9C%8D%E5%8A%A1%E7%AB%AF%E6%8A%80%E6%9C%AF%E8%A7%84%E8%8C%83)
 
 ### 核心规范兼容性
 **100% 实现** - 所有12个核心API端点均已完全实现
