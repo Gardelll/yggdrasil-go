@@ -1,7 +1,7 @@
 //go:build postgres
 
 /*
- * Copyright (C) 2025. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2025. Gardel <gardel741@outlook.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
