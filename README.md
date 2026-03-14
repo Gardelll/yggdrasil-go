@@ -21,6 +21,9 @@
   - 无SMTP配置时：用户注册后自动验证，密码重置功能禁用
   - 有SMTP配置时：保持原有邮箱验证流程
 + MySQL 或 PostgreSQL 数据库（如果使用 SQLite 则不需要）
++ Redis 服务器（**完全可选**，用于分布式缓存和令牌持久化）
+  - 无 Redis 配置时：使用内存缓存，重启后令牌失效
+  - 有 Redis 配置时：支持 standalone、sentinel、cluster 三种部署模式
 
 ## 用法
 
@@ -104,6 +107,27 @@ java -javaagent:authlib-injector.jar=http://localhost:8080 -Dauthlibinjector.dis
 - 本认证服务器兼容正版登录，因此注册时使用的角色名不可与官方服务器重复
 - 如果客户端也关闭内置 http 端点，`@mojang` 后缀获取官方皮肤的功能将会失效
 
+## 缓存配置
+
+默认使用内存缓存，无需额外配置。如需使用 Redis 实现令牌持久化（重启不丢失）或分布式部署，在 `config.ini` 的 `[cache]` 段中配置：
+
+```ini
+[cache]
+cache_driver = redis
+redis_mode = standalone
+redis_address = 127.0.0.1:6379
+redis_password =
+redis_db = 0
+redis_key_prefix = ygg:
+```
+
+支持的 Redis 部署模式：
+- **standalone**：单节点模式
+- **sentinel**：哨兵模式（需配置 `redis_master_name`，多个哨兵地址用逗号分隔）
+- **cluster**：集群模式（多个节点地址用逗号分隔）
+
+> 注意：使用 Redis 需要在编译时包含 `redis` 构建标签（官方发布版已默认包含）。
+
 ## 实现差异
 
 本实现完全兼容 [Yggdrasil 服务端技术规范](https://github.com/yushijinhun/authlib-injector/wiki/Yggdrasil-%E6%9C%8D%E5%8A%A1%E7%AB%AF%E6%8A%80%E6%9C%AF%E8%A7%84%E8%8C%83)
@@ -112,16 +136,29 @@ java -javaagent:authlib-injector.jar=http://localhost:8080 -Dauthlibinjector.dis
 **100% 实现** - 所有12个核心API端点均已完全实现
 
 ### 实现细节差异
-1. **离线登录兼容性**（中影响）：未采用与Mojang离线验证兼容的UUID生成方式，可能影响从离线验证系统迁移的用户数据兼容性
-2. **材质ID生成算法**（低影响）：使用了与Mojang不同的材质hash计算方法
+
+#### 1. UUID 生成方式
+
+通过 `config.ini` 中 `[server]` 段的 `offline_uuid` 选项控制：
+
+| 配置 | UUID 生成方式 | 是否允许改名 | 适用场景 |
+|------|-------------|------------|---------|
+| `offline_uuid = false`（默认） | 注册时随机生成 UUID | 允许 | 全新部署、在线验证服务器 |
+| `offline_uuid = true` | 根据角色名确定性生成，与 Minecraft 离线模式算法一致（`OfflinePlayer:<name>` 的 MD5） | 禁止（改名会导致 UUID 变化） | 从离线/盗版服务器迁移，需保留玩家数据 |
+
+> 注意：`offline_uuid` 选项应在首次部署前决定，启用后切换可能导致已有玩家的 UUID 不一致。
+
+#### 2. 材质 ID 生成算法
+
+使用了与 Mojang 不同的材质 hash 计算方法。
 
 ## 贡献指南
 
 我们欢迎任何形式的贡献！在提交贡献之前，请注意：
 
 ### 开发环境准备
-1. 安装 Go 1.19+
-2. 安装 Node.js 和 Yarn（用于前端开发）
+1. 安装 Go 1.25+
+2. 安装 Node.js 22+ 和 Yarn（用于前端开发）
 3. Fork 项目并创建功能分支
 
 ### 启动后端服务
@@ -153,4 +190,7 @@ yarn dev
 - [x] 支持不同的数据库如 PostgreSQL 等
 - [x] SMTP配置可选化（无SMTP时自动禁用邮箱验证）
 - [x] 添加选项以支持完全离线模式（不检查 Mojang 接口）或多个上游认证服务器
-- [ ] 令牌持久化防止升级和重启时令牌生效
+- [x] 兼容离线 UUID 生成方式，支持从离线验证系统迁移
+- [x] 支持 Redis 缓存后端，实现令牌持久化
+- [ ] 提供管理后台，便于配置账号和材质
+- [ ] 支持邀请码注册功能
