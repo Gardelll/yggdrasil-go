@@ -1,6 +1,6 @@
 FROM debian:12-slim
 
-LABEL maintainer="Gardel <sunxinao@hotmail.com>"
+LABEL maintainer="Gardel <gardel741@outlook.com>"
 LABEL "Description"="Go Yggdrasil Server"
 
 RUN apt-get update && apt-get install -y ca-certificates
