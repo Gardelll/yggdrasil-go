@@ -25,6 +25,25 @@ yggdrasil
 /*.db
 /config.ini
 
+# IDE
+.vscode/
+
+# Debug binaries
+__debug_bin*
+
+# Frontend build artifacts
+frontend/.next/
+frontend/.yarn/
+frontend/dist/
+frontend/node_modules/
+*.tsbuildinfo
+
+# Test artifacts
+/*.png
+
+# NFS temporary files
+.nfs*
+
 # Logs and environment files
 *.log
 *.log.*

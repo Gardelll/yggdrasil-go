@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2023-2025. Gardel <gardel741@outlook.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,39 +15,25 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import type { Metadata } from 'next'
+import { Toaster } from 'sonner'
+import './globals.css'
 
-.header {
-    text-align: center;
+export const metadata: Metadata = {
+  title: 'Yggdrasil',
 }
 
-.user-card {
-    padding: 14px 24px;
-    margin: auto;
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="zh">
+      <body className="min-h-screen antialiased">
+        {children}
+        <Toaster position="bottom-right" />
+      </body>
+    </html>
+  )
 }
-
-.model,
-.textureType,
-.url,
-.changeTo {
-    display: block;
-    width: 87%;
-    margin: 20px auto;
-}
-
-.file {
-    display: flex;
-    width: 87%;
-    margin: 20px auto;
-}
-
-.button-container {
-    display: flex;
-    justify-content: flex-end;
-    width: 87%;
-    margin: auto;
-}
-
-.button-container button {
-    margin: 3px;
-}
-

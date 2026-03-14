@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2023-2025. Gardel <gardel741@outlook.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import {Box} from '@mui/material';
 import * as THREE from 'three';
 import {Canvas, RootState, useFrame, useLoader} from '@react-three/fiber';
 import React from 'react';
@@ -26,28 +25,29 @@ import {BlendFunction} from 'postprocessing';
 
 function PlayerModel(props: { skinUrl: string, capeUrl?: string, slim?: boolean }) {
     const {skinUrl, capeUrl, slim} = props;
-    console.log(props);
     const skinTexture: THREE.Texture = useLoader(THREE.TextureLoader, skinUrl);
     skinTexture.magFilter = THREE.NearestFilter;
     skinTexture.minFilter = THREE.NearestFilter;
     skinTexture.anisotropy = 0;
     skinTexture.needsUpdate = true;
-    let version = 0;
-    if (skinTexture.image.height > 32) {
-        version = 1;
-    }
-    let capeTexture: THREE.Texture | undefined = undefined;
-    if (capeUrl) {
-        capeTexture = useLoader(THREE.TextureLoader, capeUrl);
-        if (capeTexture) {
-            capeTexture.magFilter = THREE.NearestFilter;
-            capeTexture.minFilter = THREE.NearestFilter;
-            capeTexture.anisotropy = 0;
-            capeTexture.needsUpdate = true;
-        }
-    }
-    let playerModel = createPlayerModel(skinTexture, capeTexture, version, slim);
-    useFrame((state, delta) => {
+    const version = skinTexture.image.height > 32 ? 1 : 0;
+
+    const rawCapeTexture: THREE.Texture = useLoader(THREE.TextureLoader, capeUrl ?? skinUrl);
+    const capeTexture = React.useMemo(() => {
+        if (!capeUrl) return undefined;
+        rawCapeTexture.magFilter = THREE.NearestFilter;
+        rawCapeTexture.minFilter = THREE.NearestFilter;
+        rawCapeTexture.anisotropy = 0;
+        rawCapeTexture.needsUpdate = true;
+        return rawCapeTexture;
+    }, [capeUrl, rawCapeTexture]);
+
+    const playerModel = React.useMemo(
+        () => createPlayerModel(skinTexture, capeTexture, version, slim),
+        [skinTexture, capeTexture, version, slim]
+    );
+
+    useFrame((_state, delta) => {
         playerModel.rotation.y += delta * 0.7;
     });
     return (
@@ -61,19 +61,16 @@ function SkinRender(props: { skinUrl: string, capeUrl?: string, slim?: boolean }
         state.gl.shadowMap.type = THREE.PCFSoftShadowMap;
     };
     return (
-        <Box component="div" height="600px">
-            <section className="header">
-                <h3>预览</h3>
-            </section>
+        <div className="h-full min-h-[300px]">
 
             <Canvas
-                camera={{position: [0, 15, 35], near: 5}}
+                camera={{position: [0, 5, 30], near: 5}}
                 gl={{antialias: true, alpha: true, preserveDrawingBuffer: true}}
                 onCreated={onCanvasCreate}>
                 <ambientLight color={0xffffff}/>
                 <PlayerModel {...props}/>
-                <OrbitControls makeDefault/>
-                <EffectComposer>
+                <OrbitControls makeDefault target={[0, 5, 0]}/>
+                <EffectComposer enableNormalPass>
                     <SSAO
                         blendFunction={BlendFunction.OVERLAY}
                         samples={30}
@@ -89,7 +86,7 @@ function SkinRender(props: { skinUrl: string, capeUrl?: string, slim?: boolean }
                     />
                 </EffectComposer>
             </Canvas>
-        </Box>
+        </div>
     );
 }
 

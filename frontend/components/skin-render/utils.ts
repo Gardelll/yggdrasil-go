@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2023-2025. Gardel <gardel741@outlook.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,16 +16,15 @@
  */
 
 import * as THREE from 'three';
-import {texturePositions} from './texture-positions';
+import {texturePositions, type CubeTexture} from './texture-positions';
 import {BufferAttribute} from 'three';
 
-function createCube(texture: THREE.Texture, width: number, height: number, depth: number, textures: any, slim: boolean, name: string, transparent: boolean = false) {
+function createCube(texture: THREE.Texture, width: number, height: number, depth: number, textures: CubeTexture, slim: boolean, name: string, transparent: boolean = false) {
     let textureWidth: number = texture.image.width;
     let textureHeight: number = texture.image.height;
 
     let geometry = new THREE.BoxGeometry(width, height, depth);
     let material = new THREE.MeshStandardMaterial({
-        /*color: 0x00ff00,*/
         map: texture,
         transparent: transparent || false,
         alphaTest: 0.1,
@@ -36,15 +35,10 @@ function createCube(texture: THREE.Texture, width: number, height: number, depth
 
     const uvAttribute = geometry.getAttribute('uv') as BufferAttribute;
 
-    let faceNames = ['right', 'left', 'top', 'bottom', 'front', 'back'];
+    let faceNames: (keyof CubeTexture)[] = ['right', 'left', 'top', 'bottom', 'front', 'back'];
     let faceUvs = [];
     for (let i = 0; i < faceNames.length; i++) {
         let face = textures[faceNames[i]];
-        // if (faceNames[i] === 'back') {
-            //     console.log(face)
-            // console.log("X: " + (slim && face.sx ? face.sx : face.x))
-            // console.log("W: " + (slim && face.sw ? face.sw : face.w))
-        // }
         let w = textureWidth;
         let h = textureHeight;
         let tx1 = ((slim && face.sx ? face.sx : face.x) / w);
@@ -58,8 +52,6 @@ function createCube(texture: THREE.Texture, width: number, height: number, depth
             new THREE.Vector2(tx2, ty1),
             new THREE.Vector2(tx2, ty2)
         ];
-        // console.log(faceUvs[i])
-
         let flipX = face.flipX;
         let flipY = face.flipY;
 
@@ -260,7 +252,6 @@ export default function createPlayerModel(skinTexture: THREE.Texture, capeTextur
     playerGroup.add(rightLegGroup);
 
     if (capeTexture) {
-        console.log(texturePositions);
         let capeTextureCoordinates = texturePositions.capeRelative;
         if (capeType === 'optifine') {
             capeTextureCoordinates = texturePositions.capeOptifineRelative;
@@ -268,9 +259,7 @@ export default function createPlayerModel(skinTexture: THREE.Texture, capeTextur
         if (capeType === 'labymod') {
             capeTextureCoordinates = texturePositions.capeLabymodRelative;
         }
-        capeTextureCoordinates = JSON.parse(JSON.stringify(capeTextureCoordinates)); // bad clone to keep the below scaling from affecting everything
-
-        console.log(capeTextureCoordinates);
+        capeTextureCoordinates = structuredClone(capeTextureCoordinates);
 
         type CubeTextureKey = 'left' | 'right' | 'front' | 'back' | 'top' | 'bottom'
         // Multiply coordinates by image dimensions
@@ -281,8 +270,6 @@ export default function createPlayerModel(skinTexture: THREE.Texture, capeTextur
             capeTextureCoordinates[key].y *= capeTexture.image.height;
             capeTextureCoordinates[key].h *= capeTexture.image.height;
         }
-
-        console.log(capeTextureCoordinates);
 
         let capeGroup = new THREE.Object3D();
         capeGroup.name = 'capeGroup';

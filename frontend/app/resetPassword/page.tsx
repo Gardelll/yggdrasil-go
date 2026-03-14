@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2023-2025. Gardel <gardel741@outlook.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,10 +15,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+'use client'
+
+import PasswordReset from '@/components/password-reset'
+import AuthLayout from '@/components/auth-layout'
+
+export default function ResetPasswordPage() {
+  return (
+    <AuthLayout>
+      <PasswordReset />
+    </AuthLayout>
+  )
 }

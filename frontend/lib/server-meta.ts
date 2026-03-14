@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2023-2025. Gardel <gardel741@outlook.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,30 +15,27 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-.header {
-    text-align: center;
+import React from 'react'
+import axios from 'axios'
+
+export type ServerMeta = {
+  meta: {
+    serverName?: string
+    implementationName?: string
+    implementationVersion?: string
+  }
 }
 
-.login-card {
-    padding: 14px 24px;
-    margin: auto;
-}
-
-.username,
-.profileName,
-.password {
-    display: block;
-    width: 87%;
-    margin: 20px auto;
-}
-
-.button-container {
-    display: flex;
-    justify-content: flex-end;
-    width: 87%;
-    margin: auto;
-}
-
-.button-container button {
-    margin: 3px;
+export function useServerMeta() {
+  const [meta, setMeta] = React.useState<ServerMeta | null>(null)
+  React.useEffect(() => {
+    axios.get<ServerMeta>('/yggdrasil')
+      .then(res => {
+        setMeta(res.data)
+        const name = res.data?.meta?.serverName
+        if (name) document.title = name
+      })
+      .catch(() => {})
+  }, [])
+  return meta
 }

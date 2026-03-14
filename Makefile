@@ -18,7 +18,7 @@ get:
 
 assets:
 	mkdir -p assets
-	yarn --cwd frontend install --frozen-lockfile --non-interactive
+	yarn --cwd frontend install
 	yarn --cwd frontend build
 	cp -r frontend/dist/. assets/
 

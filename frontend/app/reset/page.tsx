@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2023-2025. Gardel <gardel741@outlook.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,29 +15,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-.header {
-    text-align: center;
-}
+'use client'
 
-.reset-card {
-    padding: 14px 24px;
-    margin: auto;
-}
+import ResetForm from '@/components/reset-form'
+import AuthLayout from '@/components/auth-layout'
 
-.username,
-.password {
-    display: block;
-    width: 87%;
-    margin: 20px auto;
-}
-
-.button-container {
-    display: flex;
-    justify-content: flex-end;
-    width: 87%;
-    margin: auto;
-}
-
-.button-container button {
-    margin: 3px;
+export default function ResetPage() {
+  return (
+    <AuthLayout>
+      <ResetForm />
+    </AuthLayout>
+  )
 }

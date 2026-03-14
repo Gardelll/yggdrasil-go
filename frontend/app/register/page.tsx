@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023. Gardel <sunxinao@hotmail.com> and contributors
+ * Copyright (C) 2023-2025. Gardel <gardel741@outlook.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,10 +15,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import {Collapse, FormHelperText, FormHelperTextProps, useFormControl} from '@mui/material';
+'use client'
 
-export function FocusedShowHelperText(props: FormHelperTextProps) {
-    const {focused} = useFormControl() || {};
+import RegisterForm from '@/components/register-form'
+import AuthLayout from '@/components/auth-layout'
 
-    return <Collapse in={focused}><FormHelperText id={props.id}>{props.children}</FormHelperText></Collapse>;
+export default function RegisterPage() {
+  return (
+    <AuthLayout>
+      <RegisterForm />
+    </AuthLayout>
+  )
 }
