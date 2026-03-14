@@ -20,8 +20,8 @@ import {texturePositions, type CubeTexture} from './texture-positions';
 import {BufferAttribute} from 'three';
 
 function createCube(texture: THREE.Texture, width: number, height: number, depth: number, textures: CubeTexture, slim: boolean, name: string, transparent: boolean = false) {
-    let textureWidth: number = texture.image.width;
-    let textureHeight: number = texture.image.height;
+    let textureWidth: number = (texture.image as HTMLImageElement).width;
+    let textureHeight: number = (texture.image as HTMLImageElement).height;
 
     let geometry = new THREE.BoxGeometry(width, height, depth);
     let material = new THREE.MeshStandardMaterial({
@@ -263,12 +263,13 @@ export default function createPlayerModel(skinTexture: THREE.Texture, capeTextur
 
         type CubeTextureKey = 'left' | 'right' | 'front' | 'back' | 'top' | 'bottom'
         // Multiply coordinates by image dimensions
+        const capeImage = capeTexture.image as HTMLImageElement;
         for (let cord in capeTextureCoordinates) {
             let key = cord as CubeTextureKey;
-            capeTextureCoordinates[key].x *= capeTexture.image.width;
-            capeTextureCoordinates[key].w *= capeTexture.image.width;
-            capeTextureCoordinates[key].y *= capeTexture.image.height;
-            capeTextureCoordinates[key].h *= capeTexture.image.height;
+            capeTextureCoordinates[key].x *= capeImage.width;
+            capeTextureCoordinates[key].w *= capeImage.width;
+            capeTextureCoordinates[key].y *= capeImage.height;
+            capeTextureCoordinates[key].h *= capeImage.height;
         }
 
         let capeGroup = new THREE.Object3D();

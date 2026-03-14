@@ -30,7 +30,7 @@ function PlayerModel(props: { skinUrl: string, capeUrl?: string, slim?: boolean 
     skinTexture.minFilter = THREE.NearestFilter;
     skinTexture.anisotropy = 0;
     skinTexture.needsUpdate = true;
-    const version = skinTexture.image.height > 32 ? 1 : 0;
+    const version = (skinTexture.image as HTMLImageElement).height > 32 ? 1 : 0;
 
     const rawCapeTexture: THREE.Texture = useLoader(THREE.TextureLoader, capeUrl ?? skinUrl);
     const capeTexture = React.useMemo(() => {
