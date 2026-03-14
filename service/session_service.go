@@ -19,12 +19,15 @@ package service
 
 import (
 	"context"
-	lru "github.com/hashicorp/golang-lru"
 	"net/http"
+	"time"
+	"yggdrasil-go/cache"
 	"yggdrasil-go/dto"
 	"yggdrasil-go/model"
 	"yggdrasil-go/util"
 )
+
+const sessionTTL = 30 * time.Second // matches AuthenticationSession.HasExpired()
 
 type SessionService interface {
 	JoinServer(ctx context.Context, accessToken string, serverId string, selectedProfile string, ip string) error
@@ -32,19 +35,17 @@ type SessionService interface {
 }
 
 type sessionStore struct {
-	sessionCache    *lru.Cache
+	sessionCache    cache.Cache[*model.AuthenticationSession]
 	tokenService    TokenService
 	upstreamService IUpstreamService // Upstream authentication service (optional)
 }
 
-func NewSessionService(service TokenService, upstreamService IUpstreamService) SessionService {
-	cache, _ := lru.New(100000)
-	store := sessionStore{
-		sessionCache:    cache,
+func NewSessionService(sessionCache cache.Cache[*model.AuthenticationSession], service TokenService, upstreamService IUpstreamService) SessionService {
+	return &sessionStore{
+		sessionCache:    sessionCache,
 		tokenService:    service,
 		upstreamService: upstreamService,
 	}
-	return &store
 }
 
 func (s *sessionStore) JoinServer(ctx context.Context, accessToken string, serverId string, selectedProfile string, ip string) error {
@@ -55,7 +56,7 @@ func (s *sessionStore) JoinServer(ctx context.Context, accessToken string, serve
 			return util.NewForbiddenOperationError(util.MessageInvalidToken)
 		}
 		session := model.NewAuthenticationSession(serverId, token, ip)
-		s.sessionCache.Add(serverId, &session)
+		_ = s.sessionCache.Set(serverId, &session, sessionTTL)
 	} else {
 		// Use upstream service if configured (tasks.md T018)
 		// Forward the join request to upstream authentication service
@@ -72,12 +73,10 @@ func (s *sessionStore) JoinServer(ctx context.Context, accessToken string, serve
 }
 
 func (s *sessionStore) HasJoinedServer(ctx context.Context, serverId string, username string, ip string, textureBaseUrl string) (*dto.CompleteProfileResponse, error) {
-	if value, ok := s.sessionCache.Get(serverId); ok {
-		if session, ok := value.(*model.AuthenticationSession); ok {
-			if !(session.HasExpired() && s.sessionCache.Remove(serverId)) &&
-				(ip == "" || ip == session.Ip) && (session.Token.SelectedProfile.Name == username) {
-				return session.Token.SelectedProfile.ToCompleteResponse(true, textureBaseUrl)
-			}
+	if session, ok := s.sessionCache.Get(serverId); ok {
+		if !(session.HasExpired() && s.sessionCache.Remove(serverId)) &&
+			(ip == "" || ip == session.Ip) && (session.Token.SelectedProfile.Name == username) {
+			return session.Token.SelectedProfile.ToCompleteResponse(true, textureBaseUrl)
 		}
 	} else {
 		// Use upstream service if configured (tasks.md T018)

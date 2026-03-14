@@ -20,10 +20,10 @@ package service
 import (
 	"bytes"
 	"fmt"
-	lru "github.com/hashicorp/golang-lru"
 	"github.com/wneessen/go-mail"
 	"regexp"
 	"text/template"
+	"yggdrasil-go/cache"
 	"yggdrasil-go/model"
 	"yggdrasil-go/util"
 )
@@ -55,7 +55,7 @@ type SmtpConfig struct {
 }
 
 type regTokenServiceImpl struct {
-	tokenCache            *lru.Cache
+	tokenCache            cache.Cache[model.RegToken]
 	smtpEnabled           bool
 	smtpServer            string
 	smtpPort              int
@@ -77,15 +77,13 @@ func removeHtmlComments(htmlContent string) string {
 	return commentRegex.ReplaceAllString(htmlContent, "")
 }
 
-func NewRegTokenService(smtpCfg *SmtpConfig) RegTokenService {
-	cache, _ := lru.New(10000000)
-
+func NewRegTokenService(tokenCache cache.Cache[model.RegToken], smtpCfg *SmtpConfig) RegTokenService {
 	// Remove HTML comments from templates
 	registerTemplate := removeHtmlComments(smtpCfg.RegisterTemplate)
 	resetPasswordTemplate := removeHtmlComments(smtpCfg.ResetPasswordTemplate)
 
 	impl := regTokenServiceImpl{
-		tokenCache:            cache,
+		tokenCache:            tokenCache,
 		smtpEnabled:           smtpCfg.Enabled,
 		smtpServer:            smtpCfg.SmtpServer,
 		smtpPort:              smtpCfg.SmtpPort,
@@ -107,7 +105,7 @@ func (r *regTokenServiceImpl) SendTokenEmail(tokenType RegTokenType, email strin
 	}
 
 	token := model.NewRegToken(email)
-	r.tokenCache.Add(token.AccessToken, token)
+	_ = r.tokenCache.Set(token.AccessToken, token, 0)
 
 	var subject, body string
 	buf := bytes.Buffer{}
@@ -152,16 +150,14 @@ func (r *regTokenServiceImpl) SendTokenEmail(tokenType RegTokenType, email strin
 }
 
 func (r *regTokenServiceImpl) VerifyToken(accessToken string) (string, error) {
-	token, ok := r.tokenCache.Get(accessToken)
+	regToken, ok := r.tokenCache.Get(accessToken)
 	if !ok {
 		return "", util.NewIllegalArgumentError(util.MessageInvalidToken)
 	}
 
-	if regToken, ok := token.(model.RegToken); ok {
-		if regToken.IsValid() {
-			r.tokenCache.Remove(accessToken)
-			return regToken.Email, nil
-		}
+	if regToken.IsValid() {
+		r.tokenCache.Remove(accessToken)
+		return regToken.Email, nil
 	}
 
 	return "", util.NewIllegalArgumentError("wrong access token or email")

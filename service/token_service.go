@@ -18,11 +18,15 @@
 package service
 
 import (
+	"time"
+
 	"github.com/google/uuid"
-	lru "github.com/hashicorp/golang-lru"
+	"yggdrasil-go/cache"
 	"yggdrasil-go/model"
 	"yggdrasil-go/util"
 )
+
+const tokenTTL = 30 * 24 * time.Hour // 30 days, matches Token.GetAvailableLevel() Invalid threshold
 
 type TokenService interface {
 	RemoveToken(token *model.Token)
@@ -35,15 +39,13 @@ type TokenService interface {
 }
 
 type tokenStore struct {
-	tokenCache *lru.Cache
+	tokenCache cache.IndexedCache[*model.Token]
 }
 
-func NewTokenService() TokenService {
-	cache, _ := lru.New(10000000)
-	store := tokenStore{
-		tokenCache: cache,
+func NewTokenService(tokenCache cache.IndexedCache[*model.Token]) TokenService {
+	return &tokenStore{
+		tokenCache: tokenCache,
 	}
-	return &store
 }
 
 func (t *tokenStore) RemoveToken(token *model.Token) {
@@ -55,14 +57,8 @@ func (t *tokenStore) RemoveAccessToken(accessToken string) {
 }
 
 func (t *tokenStore) RemoveAll(profileId uuid.UUID) {
-	keys := t.tokenCache.Keys()
-	for _, k := range keys {
-		if v, ok := t.tokenCache.Get(k); ok {
-			if v.(*model.Token).SelectedProfile.Id == profileId {
-				t.tokenCache.Remove(k)
-			}
-		}
-	}
+	indexKey := util.UnsignedString(profileId)
+	t.tokenCache.RemoveByIndex(indexKey)
 }
 
 func (t *tokenStore) AcquireToken(user *model.User, clientToken *string, profile *model.Profile) *model.Token {
@@ -74,41 +70,36 @@ func (t *tokenStore) AcquireToken(user *model.User, clientToken *string, profile
 		}
 	}
 	token := model.NewToken(util.RandomUUID(), clientToken, profile)
-	t.tokenCache.Add(token.AccessToken, &token)
+	indexKey := util.UnsignedString(profile.Id)
+	_ = t.tokenCache.SetWithIndex(token.AccessToken, &token, tokenTTL, indexKey)
 	return &token
 }
 
 func (t *tokenStore) VerifyToken(accessToken string, clientToken *string) model.AvailableLevel {
-	if value, ok := t.tokenCache.Get(accessToken); ok {
-		if token, ok := value.(*model.Token); ok {
-			if clientToken != nil && token.ClientToken != *clientToken {
-				return model.Invalid
-			}
-			if token.GetAvailableLevel() == model.Invalid {
-				t.RemoveToken(token)
-			}
-			return token.GetAvailableLevel()
+	token, ok := t.tokenCache.Get(accessToken)
+	if ok {
+		if clientToken != nil && token.ClientToken != *clientToken {
+			return model.Invalid
 		}
+		if token.GetAvailableLevel() == model.Invalid {
+			t.RemoveToken(token)
+		}
+		return token.GetAvailableLevel()
 	}
 	return model.Invalid
 }
 
 func (t *tokenStore) GetToken(accessToken string) (*model.Token, bool) {
-	if value, ok := t.tokenCache.Get(accessToken); ok {
-		if token, ok := value.(*model.Token); ok {
-			return token, true
-		}
-	}
-	return nil, false
+	return t.tokenCache.Get(accessToken)
 }
 
 func (t *tokenStore) UpdateProfile(profileId uuid.UUID, profile *model.Profile) {
-	keys := t.tokenCache.Keys()
+	indexKey := util.UnsignedString(profileId)
+	keys := t.tokenCache.GetByIndex(indexKey)
 	for _, k := range keys {
-		if v, ok := t.tokenCache.Get(k); ok {
-			if token := v.(*model.Token); token.SelectedProfile.Id == profileId {
-				token.SelectedProfile = *profile
-			}
+		if token, ok := t.tokenCache.Get(k); ok {
+			token.SelectedProfile = *profile
+			_ = t.tokenCache.SetWithIndex(k, token, tokenTTL, indexKey)
 		}
 	}
 }

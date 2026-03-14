@@ -23,19 +23,19 @@ import (
 )
 
 type RegToken struct {
-	createAt    int64
-	AccessToken string
-	Email       string
+	CreatedAt   int64  `json:"created_at"`
+	AccessToken string `json:"access_token"`
+	Email       string `json:"email"`
 }
 
 func NewRegToken(email string) (this RegToken) {
 	this.Email = email
 	this.AccessToken = util.RandomUUID()
-	this.createAt = time.Now().UnixMilli()
+	this.CreatedAt = time.Now().UnixMilli()
 	return this
 }
 
 func (t *RegToken) IsValid() bool {
-	d := time.Now().Sub(time.UnixMilli(t.createAt))
+	d := time.Now().Sub(time.UnixMilli(t.CreatedAt))
 	return d < 10*time.Minute
 }

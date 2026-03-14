@@ -20,21 +20,21 @@ package model
 import "time"
 
 type AuthenticationSession struct {
-	ServerId string
-	Token    Token
-	Ip       string
-	createAt int64
+	ServerId  string `json:"server_id"`
+	Token     Token  `json:"token"`
+	Ip        string `json:"ip"`
+	CreatedAt int64  `json:"created_at"`
 }
 
 func NewAuthenticationSession(serverId string, token *Token, ip string) (session AuthenticationSession) {
 	session.ServerId = serverId
 	session.Token = *token
 	session.Ip = ip
-	session.createAt = time.Now().UnixMilli()
+	session.CreatedAt = time.Now().UnixMilli()
 	return session
 }
 
 func (s *AuthenticationSession) HasExpired() bool {
-	d := time.Now().Sub(time.UnixMilli(s.createAt))
+	d := time.Now().Sub(time.UnixMilli(s.CreatedAt))
 	return d > 30*time.Second
 }

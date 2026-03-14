@@ -34,6 +34,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"yggdrasil-go/cache"
 	"yggdrasil-go/dto"
 	"yggdrasil-go/model"
 	"yggdrasil-go/router"
@@ -264,7 +265,17 @@ func main() {
 	if serverCfg.OfflineUUID {
 		log.Println("已启用离线 UUID 兼容模式")
 	}
-	router.InitRouters(r, db, &serverMeta, &smtpConfig, meta.SkinRootUrl, upstreamService, serverCfg.OfflineUUID)
+	cacheCfg := cache.Config{
+		Driver:        "memory",
+		RedisMode:     "standalone",
+		RedisAddress:  "127.0.0.1:6379",
+		RedisPassword: "",
+		RedisDB:       0,
+		RedisPrefix:   "ygg:",
+	}
+	_ = cfg.Section("cache").MapTo(&cacheCfg)
+	log.Printf("缓存驱动: %s", cacheCfg.Driver)
+	router.InitRouters(r, db, &serverMeta, &smtpConfig, meta.SkinRootUrl, upstreamService, serverCfg.OfflineUUID, &cacheCfg)
 	r.Static("/profile", "assets")
 	r.NoRoute(func(c *gin.Context) {
 		if strings.HasPrefix(c.Request.URL.Path, "/profile/") {

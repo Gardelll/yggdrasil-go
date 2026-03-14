@@ -21,6 +21,7 @@ import (
 	"image"
 	"image/color"
 	"testing"
+	"yggdrasil-go/cache"
 	"yggdrasil-go/model"
 
 	"github.com/google/uuid"
@@ -71,7 +72,8 @@ func TestSaveTexture_FirstTimeUpload(t *testing.T) {
 	}
 
 	// Create texture service
-	tokenService := NewTokenService()
+	tokenCache := cache.NewIndexedCache[*model.Token](nil, "token", 10000000)
+	tokenService := NewTokenService(tokenCache)
 	textureService := NewTextureService(tokenService, db)
 
 	// Create test image
@@ -111,7 +113,8 @@ func TestSaveTexture_MultipleUsersSharedTexture(t *testing.T) {
 	}
 
 	// Create texture service
-	tokenService := NewTokenService()
+	tokenCache := cache.NewIndexedCache[*model.Token](nil, "token", 10000000)
+	tokenService := NewTokenService(tokenCache)
 	textureService := NewTextureService(tokenService, db)
 
 	// Create test image
@@ -195,7 +198,8 @@ func TestSaveTexture_ReplaceTexture(t *testing.T) {
 	}
 
 	// Create texture service
-	tokenService := NewTokenService()
+	tokenCache := cache.NewIndexedCache[*model.Token](nil, "token", 10000000)
+	tokenService := NewTokenService(tokenCache)
 	textureService := NewTextureService(tokenService, db)
 
 	// Create test images
@@ -274,7 +278,8 @@ func TestSaveTexture_ReuploadSameTexture(t *testing.T) {
 	}
 
 	// Create texture service
-	tokenService := NewTokenService()
+	tokenCache := cache.NewIndexedCache[*model.Token](nil, "token", 10000000)
+	tokenService := NewTokenService(tokenCache)
 	textureService := NewTextureService(tokenService, db)
 
 	// Create test image

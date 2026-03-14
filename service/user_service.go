@@ -34,6 +34,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"yggdrasil-go/cache"
 	"yggdrasil-go/dto"
 	"yggdrasil-go/model"
 	"yggdrasil-go/util"
@@ -67,22 +68,21 @@ type userServiceImpl struct {
 	regTokenService RegTokenService
 	db              *gorm.DB
 	limitLruCache   *lru.Cache
-	profileKeyCache *lru.Cache
+	profileKeyCache cache.Cache[*dto.ProfileKeyPair]
 	keyPairCh       chan dto.ProfileKeyPair
 	upstreamService IUpstreamService // Upstream authentication service (optional)
 	offlineUUID     bool
 }
 
-func NewUserService(tokenService TokenService, regTokenService RegTokenService, db *gorm.DB, upstreamService IUpstreamService, offlineUUID bool) UserService {
-	cache0, _ := lru.New(10000)
-	cache1, _ := lru.New(10000)
+func NewUserService(tokenService TokenService, regTokenService RegTokenService, db *gorm.DB, profileKeyCache cache.Cache[*dto.ProfileKeyPair], upstreamService IUpstreamService, offlineUUID bool) UserService {
+	limitCache, _ := lru.New(10000)
 	ch := make(chan ProfileKeyPair, 100)
 	userService := userServiceImpl{
 		tokenService:    tokenService,
 		regTokenService: regTokenService,
 		db:              db,
-		limitLruCache:   cache0,
-		profileKeyCache: cache1,
+		limitLruCache:   limitCache,
+		profileKeyCache: profileKeyCache,
 		keyPairCh:       ch,
 		upstreamService: upstreamService,
 		offlineUUID:     offlineUUID,
@@ -536,13 +536,12 @@ func (u *userServiceImpl) allowEmail(key string) bool {
 }
 
 func (u *userServiceImpl) getProfileKey(profileId uuid.UUID) (*ProfileKeyPair, error) {
-	if value, ok := u.profileKeyCache.Get(profileId); ok {
-		if keyPair, ok := value.(*ProfileKeyPair); ok {
-			return keyPair, nil
-		}
+	key := util.UnsignedString(profileId)
+	if keyPair, ok := u.profileKeyCache.Get(key); ok {
+		return keyPair, nil
 	}
 	if keyPair, ok := <-u.keyPairCh; ok {
-		u.profileKeyCache.Add(profileId, &keyPair)
+		_ = u.profileKeyCache.Set(key, &keyPair, 0)
 		return &keyPair, nil
 	} else {
 		return nil, errors.New("unable to generate rsa key pair")

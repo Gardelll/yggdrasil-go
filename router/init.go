@@ -22,11 +22,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"time"
+	"yggdrasil-go/cache"
 	"yggdrasil-go/dto"
+	"yggdrasil-go/model"
 	"yggdrasil-go/service"
 )
 
-func InitRouters(router *gin.Engine, db *gorm.DB, meta *dto.ServerMeta, smtpCfg *service.SmtpConfig, skinRootUrl string, upstreamService service.IUpstreamService, offlineUUID bool) {
+func InitRouters(router *gin.Engine, db *gorm.DB, meta *dto.ServerMeta, smtpCfg *service.SmtpConfig, skinRootUrl string, upstreamService service.IUpstreamService, offlineUUID bool, cacheCfg *cache.Config) {
 	router.Use(cors.New(cors.Config{
 		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "HEAD"},
@@ -36,10 +38,15 @@ func InitRouters(router *gin.Engine, db *gorm.DB, meta *dto.ServerMeta, smtpCfg 
 		MaxAge:           12 * time.Hour,
 	}))
 
-	tokenService := service.NewTokenService()
-	regTokenService := service.NewRegTokenService(smtpCfg)
-	userService := service.NewUserService(tokenService, regTokenService, db, upstreamService, offlineUUID)
-	sessionService := service.NewSessionService(tokenService, upstreamService)
+	tokenCache := cache.NewIndexedCache[*model.Token](cacheCfg, "token", 10000000)
+	regTokenCache := cache.NewCache[model.RegToken](cacheCfg, "reg_token", 10000000)
+	sessionCache := cache.NewCache[*model.AuthenticationSession](cacheCfg, "session", 100000)
+	profileKeyCache := cache.NewCache[*dto.ProfileKeyPair](cacheCfg, "profile_key", 10000)
+
+	tokenService := service.NewTokenService(tokenCache)
+	regTokenService := service.NewRegTokenService(regTokenCache, smtpCfg)
+	userService := service.NewUserService(tokenService, regTokenService, db, profileKeyCache, upstreamService, offlineUUID)
+	sessionService := service.NewSessionService(sessionCache, tokenService, upstreamService)
 	textureService := service.NewTextureService(tokenService, db)
 	homeRouter := NewHomeRouter(meta, upstreamService)
 	userRouter := NewUserRouter(userService, skinRootUrl)

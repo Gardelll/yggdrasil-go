@@ -20,6 +20,8 @@ package service
 import (
 	"context"
 	"testing"
+	"yggdrasil-go/cache"
+	"yggdrasil-go/dto"
 	"yggdrasil-go/model"
 
 	"github.com/google/uuid"
@@ -45,9 +47,12 @@ func TestRegisterWithoutSMTP(t *testing.T) {
 	smtpConfig := &SmtpConfig{
 		Enabled: false,
 	}
-	regTokenService := NewRegTokenService(smtpConfig)
-	tokenService := NewTokenService()
-	userService := NewUserService(tokenService, regTokenService, db, nil) // No upstream service for tests
+	regTokenCache := cache.NewCache[model.RegToken](nil, "reg_token", 10000000)
+	regTokenService := NewRegTokenService(regTokenCache, smtpConfig)
+	tokenCache := cache.NewIndexedCache[*model.Token](nil, "token", 10000000)
+	tokenService := NewTokenService(tokenCache)
+	profileKeyCache := cache.NewCache[*dto.ProfileKeyPair](nil, "profile_key", 10000)
+	userService := NewUserService(tokenService, regTokenService, db, profileKeyCache, nil, false)
 
 	// Test registration
 	username := "test@example.com"
@@ -108,9 +113,12 @@ func TestRegisterWithSMTP(t *testing.T) {
 		RegisterTemplate:      "Test template {{.AccessToken}}",
 		ResetPasswordTemplate: "Reset template {{.AccessToken}}",
 	}
-	regTokenService := NewRegTokenService(smtpConfig)
-	tokenService := NewTokenService()
-	userService := NewUserService(tokenService, regTokenService, db, nil) // No upstream service for tests
+	regTokenCache := cache.NewCache[model.RegToken](nil, "reg_token", 10000000)
+	regTokenService := NewRegTokenService(regTokenCache, smtpConfig)
+	tokenCache := cache.NewIndexedCache[*model.Token](nil, "token", 10000000)
+	tokenService := NewTokenService(tokenCache)
+	profileKeyCache := cache.NewCache[*dto.ProfileKeyPair](nil, "profile_key", 10000)
+	userService := NewUserService(tokenService, regTokenService, db, profileKeyCache, nil, false)
 
 	// Test registration
 	username := "test2@example.com"
@@ -157,9 +165,12 @@ func TestResetPasswordWithoutSMTP(t *testing.T) {
 	smtpConfig := &SmtpConfig{
 		Enabled: false,
 	}
-	regTokenService := NewRegTokenService(smtpConfig)
-	tokenService := NewTokenService()
-	userService := NewUserService(tokenService, regTokenService, db, nil) // No upstream service for tests
+	regTokenCache := cache.NewCache[model.RegToken](nil, "reg_token", 10000000)
+	regTokenService := NewRegTokenService(regTokenCache, smtpConfig)
+	tokenCache := cache.NewIndexedCache[*model.Token](nil, "token", 10000000)
+	tokenService := NewTokenService(tokenCache)
+	profileKeyCache := cache.NewCache[*dto.ProfileKeyPair](nil, "profile_key", 10000)
+	userService := NewUserService(tokenService, regTokenService, db, profileKeyCache, nil, false)
 
 	// Create a test user
 	user := model.User{

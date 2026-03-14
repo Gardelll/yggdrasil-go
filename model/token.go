@@ -23,7 +23,7 @@ import (
 )
 
 type Token struct {
-	createAt        int64
+	CreatedAt       int64 `json:"created_at"`
 	ClientToken     string
 	AccessToken     string
 	SelectedProfile Profile
@@ -38,7 +38,7 @@ const (
 )
 
 func NewToken(accessToken string, clientToken *string, selectedProfile *Profile) (this Token) {
-	this.createAt = time.Now().UnixMilli()
+	this.CreatedAt = time.Now().UnixMilli()
 
 	if clientToken == nil || (len(*clientToken) == 0) {
 		this.ClientToken = util.RandomUUID()
@@ -51,7 +51,7 @@ func NewToken(accessToken string, clientToken *string, selectedProfile *Profile)
 }
 
 func (t *Token) GetAvailableLevel() AvailableLevel {
-	d := time.Now().Sub(time.UnixMilli(t.createAt))
+	d := time.Now().Sub(time.UnixMilli(t.CreatedAt))
 	if d > time.Hour*24*30 {
 		return Invalid
 	} else if d > time.Hour*24*15 {
