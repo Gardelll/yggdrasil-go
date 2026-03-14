@@ -27,6 +27,7 @@ var MessageInvalidCredentials = "Invalid credentials. Invalid username or passwo
 var MessageTokenAlreadyAssigned = "Access token already has a profile assigned."
 var MessageAccessDenied = "Access denied."
 var MessageProfileNotFound = "No such profile."
+var MessageOfflineUUIDChangeProfile = "Changing profile name is not allowed in offline UUID mode."
 
 type YggdrasilError struct {
 	ErrorCode    string `json:"error"`

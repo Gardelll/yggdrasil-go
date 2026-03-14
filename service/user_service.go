@@ -70,9 +70,10 @@ type userServiceImpl struct {
 	profileKeyCache *lru.Cache
 	keyPairCh       chan dto.ProfileKeyPair
 	upstreamService IUpstreamService // Upstream authentication service (optional)
+	offlineUUID     bool
 }
 
-func NewUserService(tokenService TokenService, regTokenService RegTokenService, db *gorm.DB, upstreamService IUpstreamService) UserService {
+func NewUserService(tokenService TokenService, regTokenService RegTokenService, db *gorm.DB, upstreamService IUpstreamService, offlineUUID bool) UserService {
 	cache0, _ := lru.New(10000)
 	cache1, _ := lru.New(10000)
 	ch := make(chan ProfileKeyPair, 100)
@@ -84,6 +85,7 @@ func NewUserService(tokenService TokenService, regTokenService RegTokenService, 
 		profileKeyCache: cache1,
 		keyPairCh:       ch,
 		upstreamService: upstreamService,
+		offlineUUID:     offlineUUID,
 	}
 	go userService.genKeyPair()
 	return &userService
@@ -116,8 +118,14 @@ func (u *userServiceImpl) Register(ctx context.Context, username, password, prof
 	if err != nil {
 		return nil, err
 	}
+	var userID uuid.UUID
+	if u.offlineUUID {
+		userID = util.OfflineUUIDFromName(profileName)
+	} else {
+		userID = uuid.New()
+	}
 	user := model.User{
-		ID:       uuid.New(),
+		ID:       userID,
 		Email:    username,
 		Password: string(hashedPass),
 	}
@@ -194,6 +202,9 @@ func (u *userServiceImpl) Login(username string, password string, clientToken *s
 }
 
 func (u *userServiceImpl) ChangeProfile(ctx context.Context, accessToken string, clientToken *string, changeTo string) error {
+	if u.offlineUUID {
+		return util.NewForbiddenOperationError(util.MessageOfflineUUIDChangeProfile)
+	}
 	if u.tokenService.VerifyToken(accessToken, clientToken) != model.Valid {
 		return util.NewForbiddenOperationError(util.MessageInvalidToken)
 	}

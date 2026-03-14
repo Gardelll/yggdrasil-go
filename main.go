@@ -52,6 +52,7 @@ type MetaCfg struct {
 type ServerCfg struct {
 	ServerAddress  string   `ini:"server_address"`
 	TrustedProxies []string `ini:"trusted_proxies"`
+	OfflineUUID    bool     `ini:"offline_uuid"`
 }
 
 type SmtpCfg struct {
@@ -260,7 +261,10 @@ func main() {
 		upstreamService = nil
 	}
 
-	router.InitRouters(r, db, &serverMeta, &smtpConfig, meta.SkinRootUrl, upstreamService)
+	if serverCfg.OfflineUUID {
+		log.Println("已启用离线 UUID 兼容模式")
+	}
+	router.InitRouters(r, db, &serverMeta, &smtpConfig, meta.SkinRootUrl, upstreamService, serverCfg.OfflineUUID)
 	r.Static("/profile", "assets")
 	r.NoRoute(func(c *gin.Context) {
 		if strings.HasPrefix(c.Request.URL.Path, "/profile/") {

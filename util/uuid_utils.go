@@ -18,6 +18,7 @@
 package util
 
 import (
+	"crypto/md5"
 	"encoding/hex"
 	"github.com/google/uuid"
 )
@@ -34,4 +35,15 @@ func ToUUID(str string) (uuid.UUID, error) {
 
 func RandomUUID() string {
 	return UnsignedString(uuid.New())
+}
+
+// OfflineUUIDFromName computes a deterministic UUID from a player name,
+// compatible with Java's UUID.nameUUIDFromBytes(("OfflinePlayer:" + name).getBytes(UTF_8)).
+// This is NOT a standard RFC 4122 namespace-based UUID v3; it hashes the raw
+// "OfflinePlayer:<name>" bytes with MD5, then sets version=3 and IETF variant bits.
+func OfflineUUIDFromName(name string) uuid.UUID {
+	hash := md5.Sum([]byte("OfflinePlayer:" + name))
+	hash[6] = (hash[6] & 0x0f) | 0x30 // version 3
+	hash[8] = (hash[8] & 0x3f) | 0x80 // IETF variant
+	return uuid.UUID(hash)
 }
