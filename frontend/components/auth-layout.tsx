@@ -103,7 +103,7 @@ function TitleBlock({ meta, mobile }: { meta: ServerMeta | null; mobile?: boolea
       <div className="relative z-10 text-center">
         <h2
           className="text-xl font-bold"
-          style={{ fontFamily: '"Cinzel", serif', color: 'rgba(255,255,255,0.88)', letterSpacing: '0.08em' }}
+          style={{ fontFamily: 'var(--font-cinzel), serif', color: 'rgba(255,255,255,0.88)', letterSpacing: '0.08em' }}
         >
           {serverName}
         </h2>
@@ -124,7 +124,7 @@ function TitleBlock({ meta, mobile }: { meta: ServerMeta | null; mobile?: boolea
     >
       <h2
         className="text-[1.7rem] font-bold tracking-wide"
-        style={{ fontFamily: '"Cinzel", serif', color: 'rgba(255,255,255,0.88)', letterSpacing: '0.08em' }}
+        style={{ fontFamily: 'var(--font-cinzel), serif', color: 'rgba(255,255,255,0.88)', letterSpacing: '0.08em' }}
       >
         {serverName}
       </h2>

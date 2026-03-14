@@ -16,8 +16,16 @@
  */
 
 import type { Metadata } from 'next'
+import { Cinzel } from 'next/font/google'
 import { Toaster } from 'sonner'
 import './globals.css'
+
+const cinzel = Cinzel({
+  subsets: ['latin'],
+  weight: ['700'],
+  display: 'swap',
+  variable: '--font-cinzel',
+})
 
 export const metadata: Metadata = {
   title: 'Yggdrasil',
@@ -29,7 +37,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="zh">
+    <html lang="zh" className={cinzel.variable}>
       <body className="min-h-screen antialiased">
         {children}
         <Toaster position="bottom-right" />
