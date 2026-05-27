@@ -20,10 +20,14 @@ package util
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
+
+	"golang.org/x/net/proxy"
 )
 
 // HTTPResponse represents a generic HTTP response with raw body
@@ -97,4 +101,47 @@ func DoHTTPRequestWithContext(ctx context.Context, client *http.Client, method, 
 	}
 
 	return httpResp, nil
+}
+
+// BuildUpstreamHTTPClient constructs an *http.Client whose Transport routes traffic
+// through the given proxy URL. proxyURL == "" yields a direct (no-proxy) client.
+//
+// Supported schemes: http, https (via http.ProxyURL), socks5 (via golang.org/x/net/proxy).
+// Userinfo in the URL is forwarded as proxy authentication.
+func BuildUpstreamHTTPClient(proxyURL string, timeout time.Duration) (*http.Client, error) {
+	base, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return nil, errors.New("http.DefaultTransport is not *http.Transport")
+	}
+	transport := base.Clone()
+	// Always clear inherited proxy resolution so behaviour is fully driven by proxyURL.
+	transport.Proxy = nil
+
+	if proxyURL == "" {
+		return &http.Client{Transport: transport, Timeout: timeout}, nil
+	}
+
+	u, err := url.Parse(proxyURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse proxy URL: %w", err)
+	}
+
+	switch u.Scheme {
+	case "http", "https":
+		transport.Proxy = http.ProxyURL(u)
+	case "socks5":
+		dialer, err := proxy.FromURL(u, proxy.Direct)
+		if err != nil {
+			return nil, fmt.Errorf("build socks5 dialer: %w", err)
+		}
+		ctxDialer, ok := dialer.(proxy.ContextDialer)
+		if !ok {
+			return nil, errors.New("socks5 dialer does not implement proxy.ContextDialer; cannot honor request context")
+		}
+		transport.DialContext = ctxDialer.DialContext
+	default:
+		return nil, fmt.Errorf("unsupported proxy scheme %q (supported: http, https, socks5)", u.Scheme)
+	}
+
+	return &http.Client{Transport: transport, Timeout: timeout}, nil
 }

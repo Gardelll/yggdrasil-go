@@ -128,6 +128,27 @@ redis_key_prefix = ygg:
 
 > 注意：使用 Redis 需要在编译时包含 `redis` 构建标签（官方发布版已默认包含）。
 
+## 上游代理配置
+
+当服务器无法直连 Mojang 等上游认证服务（如部署在国内机房）时，可让上游 HTTP 请求走代理。支持的 scheme：`http`、`https`、`socks5`，认证信息内嵌在 URL 中（`scheme://user:pass@host:port`）。
+
+在 `config.ini` 的 `[upstream]` 段配置全局默认代理，并按需在各个 `[upstream_*]` 段中覆盖：
+
+```ini
+[upstream]
+services = mojang
+; 全局默认代理（留空表示直连）
+default_proxy = socks5://user:pass@127.0.0.1:1080
+
+[upstream_mojang]
+; 省略其他字段……
+; proxy 取值：
+;   留空     -> 继承 [upstream].default_proxy
+;   direct   -> 强制直连，忽略全局默认代理
+;   <url>    -> 使用指定代理（覆盖全局默认）
+;proxy =
+```
+
 ## 实现差异
 
 本实现完全兼容 [Yggdrasil 服务端技术规范](https://github.com/yushijinhun/authlib-injector/wiki/Yggdrasil-%E6%9C%8D%E5%8A%A1%E7%AB%AF%E6%8A%80%E6%9C%AF%E8%A7%84%E8%8C%83)

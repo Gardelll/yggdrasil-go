@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -71,6 +72,8 @@ type UpstreamServiceState struct {
 	HasJoinedURL    string        // Verify has joined endpoint (supports query parameters)
 	PublicKeysURL   string        // Public keys endpoint
 	Timeout         time.Duration // Request timeout
+	Proxy           string        // Effective proxy URL ("" means direct); informational only
+	client          *http.Client  // Per-upstream HTTP client (with proxy transport if configured)
 	Status          UpstreamStatus
 	LastErr         error
 	LastFail        time.Time
@@ -222,7 +225,6 @@ type upstreamService struct {
 	config       *util.UpstreamConfig
 	pool         *UpstreamServicePool
 	upstreams    map[string]*UpstreamServiceState
-	client       *http.Client
 	degradedMode bool // Degraded mode flag (no upstream services configured)
 
 	// Request counter for retry mechanism
@@ -239,11 +241,6 @@ func NewUpstreamService(config *util.UpstreamConfig, upstreamConfigs []*util.Ups
 	// Initialize the goroutine pool
 	pool := NewUpstreamServicePool(config.PoolSize)
 
-	// Create HTTP client with reasonable defaults
-	client := &http.Client{
-		Timeout: 30 * time.Second, // Global timeout, individual requests use their own
-	}
-
 	// Detect degraded mode
 	degradedMode := len(upstreamConfigs) == 0
 
@@ -259,6 +256,11 @@ func NewUpstreamService(config *util.UpstreamConfig, upstreamConfigs []*util.Ups
 			continue
 		}
 
+		client, err := util.BuildUpstreamHTTPClient(cfg.Proxy, 30*time.Second)
+		if err != nil {
+			return nil, fmt.Errorf("upstream %s: build http client: %w", cfg.Id, err)
+		}
+
 		state := &UpstreamServiceState{
 			ID:              cfg.Id,
 			ProfileURL:      cfg.ProfileURL,
@@ -269,6 +271,8 @@ func NewUpstreamService(config *util.UpstreamConfig, upstreamConfigs []*util.Ups
 			HasJoinedURL:    cfg.HasJoinedURL,
 			PublicKeysURL:   cfg.PublicKeysURL,
 			Timeout:         time.Duration(cfg.Timeout) * time.Millisecond,
+			Proxy:           cfg.Proxy,
+			client:          client,
 			Status:          StatusAvailable, // Initially all upstreams are available
 		}
 
@@ -278,8 +282,8 @@ func NewUpstreamService(config *util.UpstreamConfig, upstreamConfigs []*util.Ups
 	if !degradedMode {
 		log.Printf("已初始化 %d 个上游验证服务: %v", len(upstreams), config.Services)
 		for id, state := range upstreams {
-			log.Printf("  - %s: profile=%s, byname=%s, byuuid=%s, bulk=%s, join=%s, hasJoined=%s, publicKeys=%s",
-				id, state.ProfileURL, state.LookupByNameURL, state.LookupByUUIDURL, state.BulkLookupURL, state.JoinURL, state.HasJoinedURL, state.PublicKeysURL)
+			log.Printf("  - %s: profile=%s, byname=%s, byuuid=%s, bulk=%s, join=%s, hasJoined=%s, publicKeys=%s, proxy=%s",
+				id, state.ProfileURL, state.LookupByNameURL, state.LookupByUUIDURL, state.BulkLookupURL, state.JoinURL, state.HasJoinedURL, state.PublicKeysURL, redactProxyForLog(state.Proxy))
 		}
 	}
 
@@ -287,7 +291,6 @@ func NewUpstreamService(config *util.UpstreamConfig, upstreamConfigs []*util.Ups
 		config:       config,
 		pool:         pool,
 		upstreams:    upstreams,
-		client:       client,
 		degradedMode: degradedMode,
 	}
 
@@ -595,7 +598,7 @@ func (u *upstreamService) doHTTPRequestWithFullURL(ctx context.Context, upstream
 	method, fullURL string, body []byte, treat204AsSuccess bool) (*UpstreamResponse, error) {
 
 	// Use the generalized HTTP utility function
-	httpResp, err := util.DoHTTPRequestWithContext(ctx, u.client, method, fullURL, body, upstream.Timeout)
+	httpResp, err := util.DoHTTPRequestWithContext(ctx, upstream.client, method, fullURL, body, upstream.Timeout)
 
 	if err != nil && httpResp == nil {
 		return nil, err
@@ -1088,4 +1091,18 @@ func (u *upstreamService) LookupByUUID(ctx context.Context, uuid string) (*dto.U
 	}
 
 	return &profile, nil
+}
+
+// redactProxyForLog returns a proxy URL with userinfo stripped, suitable for logs.
+// Returns "direct" for the empty input.
+func redactProxyForLog(proxyURL string) string {
+	if proxyURL == "" {
+		return "direct"
+	}
+	u, err := url.Parse(proxyURL)
+	if err != nil {
+		return "<invalid>"
+	}
+	u.User = nil
+	return u.String()
 }

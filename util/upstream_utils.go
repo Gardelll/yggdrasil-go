@@ -44,6 +44,7 @@ type UpstreamConfig struct {
 	PoolSize        int      `ini:"pool_size"`
 	RetryInterval   int      `ini:"retry_interval"`
 	RecoveryTimeout int      `ini:"recovery_timeout"`
+	DefaultProxy    string   `ini:"default_proxy,omitempty"`
 }
 
 // UpstreamServiceConfig represents a single upstream service configuration
@@ -57,6 +58,9 @@ type UpstreamServiceConfig struct {
 	HasJoinedURL    string `ini:"has_joined_url"`     // Verify has joined endpoint (supports query parameters)
 	PublicKeysURL   string `ini:"public_keys_url"`    // Public keys endpoint
 	Timeout         int    `ini:"timeout"`            // Request timeout in milliseconds
+	// Proxy holds the effective proxy URL after merging with [upstream].default_proxy.
+	// "" means direct (no proxy). Populated by ParseUpstreamConfig.
+	Proxy string `ini:"-"`
 }
 
 // ParseUpstreamConfig parses the upstream configuration from an INI file
@@ -85,6 +89,13 @@ func ParseUpstreamConfig(upstreamCfg *UpstreamConfig, cfg *ini.File) ([]*Upstrea
 			Timeout:         DefaultMojangTimeout,
 		}
 		return []*UpstreamServiceConfig{mojangConfig}, nil
+	}
+
+	// Validate default proxy upfront (fail-fast even if no upstream actually inherits it).
+	if upstreamCfg.DefaultProxy != "" {
+		if err := ValidateProxyURL(upstreamCfg.DefaultProxy); err != nil {
+			return nil, fmt.Errorf("section 'upstream' has invalid default_proxy: %w", err)
+		}
 	}
 
 	// If [upstream] section exists but services is empty, return pure local mode (no upstreams)
@@ -134,6 +145,13 @@ func ParseUpstreamConfig(upstreamCfg *UpstreamConfig, cfg *ini.File) ([]*Upstrea
 			return nil, fmt.Errorf("section '%s' has invalid %s: %s", sectionName, "timeout", "Must be greater than 0")
 		}
 
+		rawProxy := section.Key("proxy").String()
+		effectiveProxy, err := ResolveUpstreamProxy(rawProxy, upstreamCfg.DefaultProxy)
+		if err != nil {
+			return nil, fmt.Errorf("section '%s' has invalid %s: %w", sectionName, "proxy", err)
+		}
+		serviceConfig.Proxy = effectiveProxy
+
 		upstreamConfigs = append(upstreamConfigs, serviceConfig)
 	}
 
@@ -154,6 +172,60 @@ func ReplaceURLPlaceholders(template string, params map[string]string) string {
 		result = strings.Replace(result, placeholder, encodedValue, -1)
 	}
 	return result
+}
+
+// supportedProxySchemes lists scheme values accepted by ValidateProxyURL.
+var supportedProxySchemes = map[string]struct{}{
+	"http":   {},
+	"https":  {},
+	"socks5": {},
+}
+
+// ValidateProxyURL validates a proxy URL string.
+// Accepts http://, https://, socks5:// with an optional userinfo and a non-empty host.
+// Returns an error for empty input — callers must handle the "no proxy" case before calling.
+func ValidateProxyURL(proxyURL string) error {
+	proxyURL = strings.TrimSpace(proxyURL)
+	if proxyURL == "" {
+		return errors.New("proxy URL is empty")
+	}
+	u, err := url.Parse(proxyURL)
+	if err != nil {
+		return fmt.Errorf("parse proxy URL: %w", err)
+	}
+	if _, ok := supportedProxySchemes[u.Scheme]; !ok {
+		return fmt.Errorf("unsupported proxy scheme %q (supported: http, https, socks5)", u.Scheme)
+	}
+	if u.Host == "" {
+		return errors.New("proxy URL missing host")
+	}
+	return nil
+}
+
+// ProxyDirectKeyword is the literal value in INI that means "no proxy, even if default is set".
+const ProxyDirectKeyword = "direct"
+
+// ResolveUpstreamProxy merges a per-upstream proxy value with the global default.
+// Returns the effective proxy URL ("" means direct).
+//
+// raw == ""                  -> inherits defaultProxy (may itself be "")
+// raw == ProxyDirectKeyword  -> "" (forces direct, overrides default)
+// raw == "<url>"             -> validated and returned as-is
+//
+// defaultProxy is assumed to have been validated earlier (or be ""). It is trimmed
+// before being returned so the resolved value is always whitespace-normalized.
+func ResolveUpstreamProxy(raw, defaultProxy string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return strings.TrimSpace(defaultProxy), nil
+	}
+	if strings.EqualFold(raw, ProxyDirectKeyword) {
+		return "", nil
+	}
+	if err := ValidateProxyURL(raw); err != nil {
+		return "", err
+	}
+	return raw, nil
 }
 
 // ValidateURLTemplate validates URL template format
